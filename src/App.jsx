@@ -44,6 +44,7 @@ const GOALS = [
 
 const newMonth = (key) => ({
   key, locked:false,
+  startingBalance:"",
   paychecks:[{id:1,label:"Paycheck 1",amount:"",note:""},{id:2,label:"Paycheck 2",amount:"",note:""}],
   commission:{amount:""},
   amex:{statementBalance:"",paid:false},
@@ -100,9 +101,29 @@ export default function App() {
   }, [currentKey]);
 
   const startNewMonth = () => {
-    setMonths(prev => ({ ...prev, [currentKey]: { ...(prev[currentKey]||newMonth(currentKey)), locked:true } }));
+    const cur = months[currentKey] || newMonth(currentKey);
+
+    // Calculate leftover to carry forward
+    const totalIn   = cur.paychecks.reduce((s,p)=>s+(parseFloat(p.amount)||0),0)
+                    + (parseFloat(cur.commission?.amount)||0)
+                    + (parseFloat(cur.startingBalance)||0);
+    const amexBal   = cur.amex?.paid  ? (parseFloat(cur.amex?.statementBalance)||0)  : 0;
+    const boaBal    = cur.boa?.paid   ? (parseFloat(cur.boa?.statementBalance)||0)    : 0;
+    const fixedOut  = cur.bills.filter(b=>b.paid).reduce((s,b)=>s+b.amount,0);
+    const directOut = (cur.directTransactions||[]).reduce((s,t)=>s+(parseFloat(t.amount)||0),0);
+    const goalOut   = Object.entries(cur.goalContributions||{}).filter(([id])=>id!=="3").reduce((s,[,v])=>s+v,0);
+    const leftover  = Math.max(0, totalIn - amexBal - boaBal - fixedOut - directOut - goalOut);
+
+    // Lock current month
+    setMonths(prev => ({ ...prev, [currentKey]: { ...cur, locked:true } }));
+
+    // Open next month with leftover as starting balance
     const [y,m] = currentKey.split("-").map(Number);
     const next = m===12 ? `${y+1}-01` : `${y}-${String(m+1).padStart(2,"0")}`;
+    setMonths(prev => ({
+      ...prev,
+      [next]: { ...(prev[next] || newMonth(next)), startingBalance: leftover > 0 ? String(Math.round(leftover)) : "" }
+    }));
     setCurrentKey(next);
     setTab("home");
   };
@@ -195,7 +216,7 @@ function HomeScreen({ month, goalSaved, onNewMonth, currentKey, months, sortedKe
   const [historyOpen, setHistoryOpen] = useState(false);
   const [expanded,    setExpanded]    = useState(null);
 
-  const totalIn   = month.paychecks.reduce((s,p)=>s+(parseFloat(p.amount)||0),0) + (parseFloat(month.commission?.amount)||0);
+  const totalIn   = month.paychecks.reduce((s,p)=>s+(parseFloat(p.amount)||0),0) + (parseFloat(month.commission?.amount)||0) + (parseFloat(month.startingBalance)||0);
   const amexBal   = month.amex?.paid ? (parseFloat(month.amex?.statementBalance)||0) : 0;
   const boaBal    = month.boa?.paid  ? (parseFloat(month.boa?.statementBalance)||0)  : 0;
   const fixedOut  = month.bills.filter(b=>b.paid).reduce((s,b)=>s+b.amount,0);
@@ -266,7 +287,15 @@ function HomeScreen({ month, goalSaved, onNewMonth, currentKey, months, sortedKe
 
       <SLabel>This Month Summary</SLabel>
       <Card>
-        {[["💰 Total Income",totalIn,"#6EE7B7"],["✅ Paid Bills & Cards",amexBal+boaBal+fixedOut,"#FCA5A5"],["🏧 Direct from Bank",directOut,"#FB923C"],["🎯 Saved to Goals (this month)",goalOut,"#C4B5FD"],["⏳ Still Pending",pendingBills,"#F59E0B"],["💵 Actual Balance",leftover,hc]].map(([l,v,c],i,arr)=>(
+        {[
+          ["🏦 Starting Balance",  parseFloat(month.startingBalance)||0, "#93C5FD"],
+          ["💰 Paychecks + Comm",  totalIn-(parseFloat(month.startingBalance)||0), "#6EE7B7"],
+          ["✅ Paid Bills & Cards", amexBal+boaBal+fixedOut, "#FCA5A5"],
+          ["🏧 Direct from Bank",  directOut, "#FB923C"],
+          ["🎯 Saved to Goals (this month)", goalOut, "#C4B5FD"],
+          ["⏳ Still Pending",     pendingBills, "#F59E0B"],
+          ["💵 Actual Balance",    leftover, hc],
+        ].map(([l,v,c],i,arr)=>(
           <div key={l}>
             <div style={{ padding:"12px 16px", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
               <span style={{ color:"rgba(255,255,255,0.7)", fontSize:14 }}>{l}</span>
@@ -481,7 +510,7 @@ function PaychecksScreen({ month, setMonth }) {
   const comm  = parseFloat(month.commission?.amount)||0;
 
   // Calculate actual balance (same logic as HomeScreen)
-  const totalIn   = total + comm;
+  const totalIn   = total + comm + (parseFloat(month.startingBalance)||0);
   const amexBal   = month.amex?.paid  ? (parseFloat(month.amex?.statementBalance)||0)  : 0;
   const boaBal    = month.boa?.paid   ? (parseFloat(month.boa?.statementBalance)||0)   : 0;
   const fixedOut  = month.bills.filter(b=>b.paid).reduce((s,b)=>s+b.amount,0);
@@ -498,6 +527,22 @@ function PaychecksScreen({ month, setMonth }) {
 
   return (
     <div>
+      {/* Starting Balance — carried over from last month */}
+      <SLabel>Starting Balance</SLabel>
+      <Card style={{ border:"1px solid rgba(52,199,89,0.25)", background:"rgba(52,199,89,0.05)" }}>
+        <div style={{ padding:"16px", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+          <div>
+            <div style={{ color:"#fff", fontSize:15, fontWeight:700 }}>Checking Account Balance</div>
+            <div style={{ color:"rgba(255,255,255,0.4)", fontSize:11, marginTop:2 }}>
+              {month.startingBalance
+                ? "✅ Auto-carried from last month — edit if needed"
+                : "Enter what's in your account at the start of this month"}
+            </div>
+          </div>
+          <MInput value={month.startingBalance||""} onChange={v=>setMonth(m=>({...m,startingBalance:v}))} hi={!!month.startingBalance} />
+        </div>
+      </Card>
+
       <SLabel>Regular Paychecks</SLabel>
       <Card>
         {month.paychecks.map((p,i,arr)=>(
@@ -673,7 +718,18 @@ function CardsScreen({ month, setMonth }) {
                 <div style={{ color:"#fff", fontSize:15, fontWeight:700 }}>Statement Balance Due</div>
                 <div style={{ color:"rgba(255,255,255,0.35)", fontSize:12, marginTop:2 }}>Type what you owe on the {ck==="amex"?"4th":"17th"}</div>
               </div>
-              <MInput value={card.statementBalance||""} onChange={v=>updBal(ck,v)} hi={!!card.statementBalance&&!card.paid} />
+              <div style={{ position:"relative", display:"inline-flex", alignItems:"center" }}>
+                <span style={{ position:"absolute", left:9, color:"#34C759", fontSize:13, fontWeight:700, pointerEvents:"none" }}>$</span>
+                <input
+                  key={`bal-${ck}`}
+                  type="number"
+                  inputMode="decimal"
+                  value={card.statementBalance||""}
+                  onChange={e=>updBal(ck,e.target.value)}
+                  placeholder="0.00"
+                  style={{ background:"rgba(52,199,89,0.1)", border:"1.5px solid rgba(52,199,89,0.35)", borderRadius:11, color:"#34C759", fontSize:14, fontWeight:700, padding:"7px 10px 7px 20px", width:110, textAlign:"right", outline:"none", fontFamily:"inherit" }}
+                />
+              </div>
             </div>
             <div onClick={()=>togglePaid(ck)} style={{ display:"flex", alignItems:"center", gap:10, cursor:"pointer", padding:"10px 12px", background:card.paid?"rgba(52,199,89,0.12)":"rgba(255,255,255,0.04)", border:`1.5px solid ${card.paid?"rgba(52,199,89,0.35)":"rgba(255,255,255,0.1)"}`, borderRadius:12, transition:"all 0.2s" }}>
               <div style={{ width:22, height:22, borderRadius:11, background:card.paid?"#34C759":"transparent", border:card.paid?"none":"2px solid rgba(255,255,255,0.25)", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0, transition:"all 0.2s" }}>
