@@ -166,7 +166,7 @@ export default function App() {
     home:      <HomeScreen month={curMonth} goalSaved={goalSaved} onNewMonth={startNewMonth} currentKey={currentKey} months={months} sortedKeys={sortedKeys} isCurrentMonth={isCurrentMonth} />,
     paychecks: <PaychecksScreen month={curMonth} setMonth={setCurMonth} />,
     cards:     <CardsScreen month={curMonth} setMonth={setCurMonth} />,
-    goals:     <GoalsScreen goalSaved={goalSaved} setGoalSaved={setGoalSaved} goalTargets={goalTargets} setGoalTargets={setGoalTargets} onContribute={addContrib} currentMonth={curMonth} month={curMonth} />,
+    goals:     <GoalsScreen goalSaved={goalSaved} setGoalSaved={setGoalSaved} goalTargets={goalTargets} setGoalTargets={setGoalTargets} onContribute={addContrib} currentMonth={curMonth} month={curMonth} setMonth={setCurMonth} />,
   };
 
   return (
@@ -836,7 +836,7 @@ function CardsScreen({ month, setMonth }) {
 }
 
 // ── GOAL CARD — standalone so state is fully isolated per card ─
-function GCard({ g, goalSaved, setGoalSaved, goalTargets, setGoalTargets, onContribute, currentMonth, camaroOpen, setCamaroOpen, camaroProps }) {
+function GCard({ g, goalSaved, setGoalSaved, goalTargets, setGoalTargets, onContribute, currentMonth, setMonth, camaroOpen, setCamaroOpen, camaroProps }) {
   const [mode,      setMode]      = useState("idle");  // "idle" | "add" | "correct" | "editTarget"
   const [val,       setVal]       = useState("");
 
@@ -861,7 +861,15 @@ function GCard({ g, goalSaved, setGoalSaved, goalTargets, setGoalTargets, onCont
   const handleCorrect = () => {
     const n = parseFloat(val);
     if (isNaN(n) || n < 0) return;
+    // Update lifetime saved total
     setGoalSaved(s => ({ ...s, [g.id]: n }));
+    // Also update this month's contribution to match the difference
+    // so the balance calculation stays accurate
+    const currentContrib = currentMonth.goalContributions?.[g.id] || 0;
+    const currentSaved = goalSaved[g.id] || 0;
+    const diff = n - currentSaved; // how much we're adjusting by
+    const newContrib = Math.max(0, currentContrib + diff);
+    setMonth(m => ({ ...m, goalContributions: { ...m.goalContributions, [g.id]: newContrib } }));
     close();
   };
   const handleEditTarget = () => {
@@ -966,7 +974,7 @@ function GCard({ g, goalSaved, setGoalSaved, goalTargets, setGoalTargets, onCont
 }
 
 // ── GOALS SCREEN ─────────────────────────────────────────────
-function GoalsScreen({ goalSaved, setGoalSaved, goalTargets, setGoalTargets, onContribute, currentMonth, month }) {
+function GoalsScreen({ goalSaved, setGoalSaved, goalTargets, setGoalTargets, onContribute, currentMonth, month, setMonth }) {
   const [camaroOpen, setCamaroOpen] = useState(false);
   const [camaroGoal, setCamaroGoal] = useState(10000);
   const [camaroMode, setCamaroMode] = useState("slow");
@@ -1080,6 +1088,7 @@ function GoalsScreen({ goalSaved, setGoalSaved, goalTargets, setGoalTargets, onC
         <GCard key={g.id} g={g} goalSaved={goalSaved} setGoalSaved={setGoalSaved}
           goalTargets={goalTargets} setGoalTargets={setGoalTargets}
           onContribute={onContribute} currentMonth={currentMonth}
+          setMonth={setMonth}
           camaroOpen={camaroOpen} setCamaroOpen={setCamaroOpen} />
       ))}
       <SLabel>🌟 Big Life Goals</SLabel>
@@ -1087,6 +1096,7 @@ function GoalsScreen({ goalSaved, setGoalSaved, goalTargets, setGoalTargets, onC
         <GCard key={g.id} g={g} goalSaved={goalSaved} setGoalSaved={setGoalSaved}
           goalTargets={goalTargets} setGoalTargets={setGoalTargets}
           onContribute={onContribute} currentMonth={currentMonth}
+          setMonth={setMonth}
           camaroOpen={camaroOpen} setCamaroOpen={setCamaroOpen}
           camaroProps={g.id===5 ? camaroTracker : null} />
       ))}
