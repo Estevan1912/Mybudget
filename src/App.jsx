@@ -631,17 +631,105 @@ function PaychecksScreen({ month, setMonth }) {
   );
 }
 
+// ── CARD ENTRY — standalone to prevent input focus loss ──────
+function CardEntry({ ck, emoji, name, color, bc, subs, month, togglePaid, updBal }) {
+  const CARD_LIMIT  = 1000;
+  const ALERT_THRESH = 750;
+  const card    = month[ck]||{};
+  const bal     = parseFloat(card.statementBalance)||0;
+  const st      = subs.reduce((s,x)=>s+x.amount,0);
+  const usePct  = bal / CARD_LIMIT;
+  const isWarn  = bal >= ALERT_THRESH && bal < CARD_LIMIT;
+  const isOver  = bal >= CARD_LIMIT;
+  const alertColor  = isOver ? "#FF6B6B" : "#F59E0B";
+  const alertBg     = isOver ? "rgba(255,107,107,0.12)" : "rgba(245,158,11,0.12)";
+  const alertBorder = isOver ? "rgba(255,107,107,0.35)" : "rgba(245,158,11,0.35)";
+
+  return (
+    <>
+      <SLabel>{emoji} {name} — Due {ck==="amex"?"4th":"17th"}</SLabel>
+      <Card style={{ border:`1px solid ${(isWarn||isOver) ? alertBorder : bc}` }}>
+        {(isWarn || isOver) && (
+          <div style={{ background:alertBg, borderBottom:`1px solid ${alertBorder}`, padding:"10px 16px", display:"flex", alignItems:"center", gap:8 }}>
+            <span style={{ fontSize:16 }}>{isOver ? "🚨" : "⚠️"}</span>
+            <div>
+              <div style={{ color:alertColor, fontSize:13, fontWeight:700 }}>
+                {isOver ? "Over limit!" : `${Math.round(usePct*100)}% of $${CARD_LIMIT} limit used`}
+              </div>
+              <div style={{ color:"rgba(255,255,255,0.45)", fontSize:11, marginTop:1 }}>
+                {isOver
+                  ? `$${Math.round(bal-CARD_LIMIT)} over your $${CARD_LIMIT} limit`
+                  : `$${Math.round(CARD_LIMIT - bal)} remaining before limit`}
+              </div>
+            </div>
+          </div>
+        )}
+        <div style={{ padding:"18px 16px" }}>
+          {bal > 0 && (
+            <div style={{ marginBottom:14 }}>
+              <div style={{ display:"flex", justifyContent:"space-between", marginBottom:5 }}>
+                <div style={{ color:"rgba(255,255,255,0.4)", fontSize:10, fontWeight:700, letterSpacing:0.6 }}>LIMIT USAGE</div>
+                <div style={{ color: isOver?"#FF6B6B": isWarn?"#F59E0B": "#34C759", fontSize:10, fontWeight:700 }}>
+                  {fmt(bal)} / ${CARD_LIMIT}
+                </div>
+              </div>
+              <div style={{ background:"rgba(255,255,255,0.08)", borderRadius:6, height:7, overflow:"hidden" }}>
+                <div style={{ height:"100%", borderRadius:6, transition:"width 0.4s", width:`${Math.min(usePct*100,100)}%`,
+                  background: isOver ? "#FF6B6B" : isWarn ? "#F59E0B" : "#34C759" }} />
+              </div>
+              <div style={{ position:"relative", height:6, marginTop:2 }}>
+                <div style={{ position:"absolute", left:"75%", top:0, width:1, height:6, background:"rgba(255,255,255,0.2)" }} />
+                <div style={{ position:"absolute", left:"75%", top:8, fontSize:8, color:"rgba(255,255,255,0.25)", transform:"translateX(-50%)" }}>75%</div>
+              </div>
+            </div>
+          )}
+          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:14 }}>
+            <div>
+              <div style={{ color:"#fff", fontSize:15, fontWeight:700 }}>Statement Balance Due</div>
+              <div style={{ color:"rgba(255,255,255,0.35)", fontSize:12, marginTop:2 }}>Type what you owe on the {ck==="amex"?"4th":"17th"}</div>
+            </div>
+            <div style={{ position:"relative", display:"inline-flex", alignItems:"center" }}>
+              <span style={{ position:"absolute", left:9, color:"#34C759", fontSize:13, fontWeight:700, pointerEvents:"none" }}>$</span>
+              <input
+                type="number" inputMode="decimal"
+                value={card.statementBalance||""}
+                onChange={e => updBal(ck, e.target.value)}
+                placeholder="0.00"
+                style={{ background:"rgba(52,199,89,0.1)", border:"1.5px solid rgba(52,199,89,0.35)", borderRadius:11, color:"#34C759", fontSize:14, fontWeight:700, padding:"7px 10px 7px 20px", width:115, textAlign:"right", outline:"none", fontFamily:"inherit" }}
+              />
+            </div>
+          </div>
+          <div onClick={()=>togglePaid(ck)} style={{ display:"flex", alignItems:"center", gap:10, cursor:"pointer", padding:"10px 12px", background:card.paid?"rgba(52,199,89,0.12)":"rgba(255,255,255,0.04)", border:`1.5px solid ${card.paid?"rgba(52,199,89,0.35)":"rgba(255,255,255,0.1)"}`, borderRadius:12, transition:"all 0.2s" }}>
+            <div style={{ width:22, height:22, borderRadius:11, background:card.paid?"#34C759":"transparent", border:card.paid?"none":"2px solid rgba(255,255,255,0.25)", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0, transition:"all 0.2s" }}>
+              {card.paid&&<svg viewBox="0 0 24 24" fill="white" width="13" height="13"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>}
+            </div>
+            <span style={{ color:card.paid?"#34C759":"rgba(255,255,255,0.5)", fontSize:14, fontWeight:600 }}>{card.paid?`✓ Paid — ${fmt(bal)} cleared!`:"Tap to mark as paid"}</span>
+          </div>
+        </div>
+        <Div/>
+        <div style={{ padding:"12px 16px 14px" }}>
+          <div style={{ color:"rgba(255,255,255,0.35)", fontSize:10, fontWeight:700, letterSpacing:0.8, marginBottom:8 }}>AUTO-SUBS · {fmt(st)}/mo included</div>
+          <div style={{ display:"flex", flexWrap:"wrap", gap:6 }}>
+            {subs.map(s=>(
+              <div key={s.id} style={{ background:"rgba(255,255,255,0.06)", borderRadius:8, padding:"4px 9px", display:"flex", gap:5 }}>
+                <span style={{ color:"rgba(255,255,255,0.55)", fontSize:11 }}>{s.label}</span>
+                <span style={{ color, fontSize:11, fontWeight:700 }}>{fmt(s.amount)}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </Card>
+    </>
+  );
+}
+
 // ── CARDS ────────────────────────────────────────────────────
 function CardsScreen({ month, setMonth }) {
-  const CARD_LIMIT    = 1000;   // both cards $1,000 limit
-  const ALERT_PCT     = 0.75;   // warn at 75%
-  const ALERT_THRESH  = CARD_LIMIT * ALERT_PCT; // $750
-
   const togglePaid = (k) => setMonth(m=>({...m,[k]:{...m[k],paid:!m[k].paid}}));
   const updBal     = (k,v) => setMonth(m=>({...m,[k]:{...m[k],statementBalance:v}}));
   const togBill    = (id) => setMonth(m=>({...m,bills:m.bills.map(b=>b.id===id?{...b,paid:!b.paid}:b)}));
   const [newTxLabel, setNewTxLabel] = useState("");
-  const [newTxAmt, setNewTxAmt]     = useState("");
+  const [newTxAmt,   setNewTxAmt]   = useState("");
 
   const addDirectTx = () => {
     if (!newTxAmt || !newTxLabel) return;
@@ -656,109 +744,10 @@ function CardsScreen({ month, setMonth }) {
   const fT = month.bills.filter(b=>b.paid).reduce((s,b)=>s+b.amount,0);
   const dT = (month.directTransactions||[]).reduce((s,t)=>s+(parseFloat(t.amount)||0),0);
 
-  const CE = ({ck,emoji,name,color,bc,subs}) => {
-    const card   = month[ck]||{};
-    const bal    = parseFloat(card.statementBalance)||0;
-    const st     = subs.reduce((s,x)=>s+x.amount,0);
-    const usePct = bal / CARD_LIMIT;
-    const isWarn = bal >= ALERT_THRESH && bal < CARD_LIMIT;
-    const isOver = bal >= CARD_LIMIT;
-    const alertColor = isOver ? "#FF6B6B" : "#F59E0B";
-    const alertBg    = isOver ? "rgba(255,107,107,0.12)" : "rgba(245,158,11,0.12)";
-    const alertBorder= isOver ? "rgba(255,107,107,0.35)" : "rgba(245,158,11,0.35)";
-
-    return (
-      <>
-        <SLabel>{emoji} {name} — Due {ck==="amex"?"4th":"17th"}</SLabel>
-        <Card style={{ border:`1px solid ${(isWarn||isOver) ? alertBorder : bc}` }}>
-          {/* Spending alert banner */}
-          {(isWarn || isOver) && (
-            <div style={{ background:alertBg, borderBottom:`1px solid ${alertBorder}`, padding:"10px 16px", display:"flex", alignItems:"center", gap:8 }}>
-              <span style={{ fontSize:16 }}>{isOver ? "🚨" : "⚠️"}</span>
-              <div>
-                <div style={{ color:alertColor, fontSize:13, fontWeight:700 }}>
-                  {isOver ? "Over limit!" : `${Math.round(usePct*100)}% of $${CARD_LIMIT} limit used`}
-                </div>
-                <div style={{ color:"rgba(255,255,255,0.45)", fontSize:11, marginTop:1 }}>
-                  {isOver
-                    ? `$${Math.round(bal-CARD_LIMIT)} over your $${CARD_LIMIT} limit`
-                    : `$${Math.round(CARD_LIMIT - bal)} remaining before limit`}
-                </div>
-              </div>
-            </div>
-          )}
-
-          <div style={{ padding:"18px 16px" }}>
-            {/* Usage bar */}
-            {bal > 0 && (
-              <div style={{ marginBottom:14 }}>
-                <div style={{ display:"flex", justifyContent:"space-between", marginBottom:5 }}>
-                  <div style={{ color:"rgba(255,255,255,0.4)", fontSize:10, fontWeight:700, letterSpacing:0.6 }}>LIMIT USAGE</div>
-                  <div style={{ color: isOver?"#FF6B6B": isWarn?"#F59E0B": "#34C759", fontSize:10, fontWeight:700 }}>
-                    {fmt(bal)} / ${CARD_LIMIT}
-                  </div>
-                </div>
-                <div style={{ background:"rgba(255,255,255,0.08)", borderRadius:6, height:7, overflow:"hidden" }}>
-                  <div style={{
-                    height:"100%", borderRadius:6, transition:"width 0.4s",
-                    width:`${Math.min(usePct*100,100)}%`,
-                    background: isOver ? "#FF6B6B" : isWarn ? "#F59E0B" : "#34C759",
-                  }} />
-                </div>
-                {/* 75% marker */}
-                <div style={{ position:"relative", height:6, marginTop:2 }}>
-                  <div style={{ position:"absolute", left:"75%", top:0, width:1, height:6, background:"rgba(255,255,255,0.2)" }} />
-                  <div style={{ position:"absolute", left:"75%", top:8, fontSize:8, color:"rgba(255,255,255,0.25)", transform:"translateX(-50%)" }}>75%</div>
-                </div>
-              </div>
-            )}
-
-            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:14 }}>
-              <div>
-                <div style={{ color:"#fff", fontSize:15, fontWeight:700 }}>Statement Balance Due</div>
-                <div style={{ color:"rgba(255,255,255,0.35)", fontSize:12, marginTop:2 }}>Type what you owe on the {ck==="amex"?"4th":"17th"}</div>
-              </div>
-              <div style={{ position:"relative", display:"inline-flex", alignItems:"center" }}>
-                <span style={{ position:"absolute", left:9, color:"#34C759", fontSize:13, fontWeight:700, pointerEvents:"none" }}>$</span>
-                <input
-                  key={`bal-${ck}`}
-                  type="number"
-                  inputMode="decimal"
-                  value={card.statementBalance||""}
-                  onChange={e=>updBal(ck,e.target.value)}
-                  placeholder="0.00"
-                  style={{ background:"rgba(52,199,89,0.1)", border:"1.5px solid rgba(52,199,89,0.35)", borderRadius:11, color:"#34C759", fontSize:14, fontWeight:700, padding:"7px 10px 7px 20px", width:110, textAlign:"right", outline:"none", fontFamily:"inherit" }}
-                />
-              </div>
-            </div>
-            <div onClick={()=>togglePaid(ck)} style={{ display:"flex", alignItems:"center", gap:10, cursor:"pointer", padding:"10px 12px", background:card.paid?"rgba(52,199,89,0.12)":"rgba(255,255,255,0.04)", border:`1.5px solid ${card.paid?"rgba(52,199,89,0.35)":"rgba(255,255,255,0.1)"}`, borderRadius:12, transition:"all 0.2s" }}>
-              <div style={{ width:22, height:22, borderRadius:11, background:card.paid?"#34C759":"transparent", border:card.paid?"none":"2px solid rgba(255,255,255,0.25)", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0, transition:"all 0.2s" }}>
-                {card.paid&&<svg viewBox="0 0 24 24" fill="white" width="13" height="13"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>}
-              </div>
-              <span style={{ color:card.paid?"#34C759":"rgba(255,255,255,0.5)", fontSize:14, fontWeight:600 }}>{card.paid?`✓ Paid — ${fmt(bal)} cleared!`:"Tap to mark as paid"}</span>
-            </div>
-          </div>
-          <Div/>
-          <div style={{ padding:"12px 16px 14px" }}>
-            <div style={{ color:"rgba(255,255,255,0.35)", fontSize:10, fontWeight:700, letterSpacing:0.8, marginBottom:8 }}>AUTO-SUBS · {fmt(st)}/mo included</div>
-            <div style={{ display:"flex", flexWrap:"wrap", gap:6 }}>
-              {subs.map(s=>(
-                <div key={s.id} style={{ background:"rgba(255,255,255,0.06)", borderRadius:8, padding:"4px 9px", display:"flex", gap:5 }}>
-                  <span style={{ color:"rgba(255,255,255,0.55)", fontSize:11 }}>{s.label}</span>
-                  <span style={{ color, fontSize:11, fontWeight:700 }}>{fmt(s.amount)}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        </Card>
-      </>
-    );
-  };
-
   return (
     <div>
-      <CE ck="amex" emoji="💳" name="American Express" color="#60A5FA" bc="rgba(96,165,250,0.2)"  subs={AMEX_SUBS} />
-      <CE ck="boa"  emoji="🏦" name="Bank of America"  color="#F59E0B" bc="rgba(245,158,11,0.2)" subs={BOA_SUBS}  />
+      <CardEntry ck="amex" emoji="💳" name="American Express" color="#60A5FA" bc="rgba(96,165,250,0.2)"  subs={AMEX_SUBS} month={month} togglePaid={togglePaid} updBal={updBal} />
+      <CardEntry ck="boa"  emoji="🏦" name="Bank of America"  color="#F59E0B" bc="rgba(245,158,11,0.2)" subs={BOA_SUBS}  month={month} togglePaid={togglePaid} updBal={updBal} />
       <SLabel>Fixed Bills</SLabel>
       <Card>
         {month.bills.map((b,i,arr)=>(
