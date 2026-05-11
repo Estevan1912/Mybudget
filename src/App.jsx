@@ -473,96 +473,7 @@ function makePieChart(slices, title) {
   return c.toDataURL('image/png').split(',')[1];
 }
 
-// ── GOOGLE SHEETS API HELPERS ────────────────────────────────
-const SHEETS_SCOPE = 'https://www.googleapis.com/auth/spreadsheets';
-const SHEETS_BASE  = 'https://sheets.googleapis.com/v4/spreadsheets';
-const rgb = hex => { const n=parseInt(hex.slice(1),16); return {red:(n>>16&255)/255,green:(n>>8&255)/255,blue:(n&255)/255}; };
-
-async function getGoogleToken(clientId, prompt='') {
-  return new Promise((resolve,reject) => {
-    if(!window.google?.accounts?.oauth2)
-      return reject(new Error('Google Identity Services not loaded — refresh the page.'));
-    window.google.accounts.oauth2.initTokenClient({
-      client_id: clientId, scope: SHEETS_SCOPE,
-      callback: r => r.error ? reject(new Error(r.error_description||r.error)) : resolve(r.access_token),
-      error_callback: e => reject(new Error(e.message||'Auth error')),
-    }).requestAccessToken({prompt});
-  });
-}
-
-async function sheetsReq(token, method, url, body) {
-  const r = await fetch(url, {
-    method, headers:{'Authorization':`Bearer ${token}`,'Content-Type':'application/json'},
-    body: body ? JSON.stringify(body) : undefined,
-  });
-  if(!r.ok){const e=await r.json();throw new Error(e.error?.message||`Sheets API error (${r.status})`);}
-  return r.json();
-}
-
-async function createGoogleSheet(token, title, sheetNames) {
-  const res = await sheetsReq(token,'POST',SHEETS_BASE,{
-    properties:{title},
-    sheets: sheetNames.map((t,i)=>({properties:{sheetId:i,title:t,index:i,gridProperties:{frozenRowCount:2}}}))
-  });
-  return {id:res.spreadsheetId, url:`https://docs.google.com/spreadsheets/d/${res.spreadsheetId}/edit`};
-}
-
-async function clearSheetData(token, sheetId, sheetNames) {
-  await sheetsReq(token,'POST',`${SHEETS_BASE}/${sheetId}/values:batchClear`,
-    {ranges: sheetNames.map(n=>`'${n}'!A:Z`)});
-}
-
-async function writeSheetValues(token, sheetId, sheetsData) {
-  await sheetsReq(token,'POST',`${SHEETS_BASE}/${sheetId}/values:batchUpdate`,{
-    valueInputOption:'USER_ENTERED',
-    data: sheetsData.map(s=>({range:`'${s.name}'!A1`, values:s.rows}))
-  });
-}
-
-async function applySheetFormatting(token, sheetId, sheetsData) {
-  const C = {
-    navy:rgb('#1B3A6B'), navy2:rgb('#2A5496'), blue:rgb('#D6E4F7'), blueTot:rgb('#E4EEFF'),
-    white:rgb('#FFFFFF'), lgray:rgb('#F5F7FA'), dark:rgb('#1A1A2E'), dim:rgb('#5A6272'),
-  };
-  const requests = [];
-  sheetsData.forEach((sheet, sid) => {
-    const nc = Math.max(...sheet.rows.map(r=>r.length), 8);
-    let dataIdx = 0;
-    sheet.rows.forEach((row, ri) => {
-      const t = sheet.types?.[ri]||'D';
-      const rng = (c0=0,c1=nc) => ({sheetId:sid,startRowIndex:ri,endRowIndex:ri+1,startColumnIndex:c0,endColumnIndex:c1});
-      if(t==='T'||t==='SEC') {
-        requests.push(
-          {repeatCell:{range:rng(),cell:{userEnteredFormat:{backgroundColor:C.navy,textFormat:{bold:true,fontSize:t==='T'?16:11,foregroundColor:C.white}}},fields:'userEnteredFormat(backgroundColor,textFormat)'}},
-          {mergeCells:{range:rng(),mergeType:'MERGE_ALL'}}
-        );
-      } else if(t==='S') {
-        requests.push(
-          {repeatCell:{range:rng(),cell:{userEnteredFormat:{backgroundColor:C.navy2,textFormat:{fontSize:9,foregroundColor:C.white}}},fields:'userEnteredFormat(backgroundColor,textFormat)'}},
-          {mergeCells:{range:rng(),mergeType:'MERGE_ALL'}}
-        );
-      } else if(t==='H') {
-        requests.push({repeatCell:{range:rng(),cell:{userEnteredFormat:{backgroundColor:C.blue,textFormat:{bold:true,fontSize:9,foregroundColor:C.navy},horizontalAlignment:'CENTER'}},fields:'userEnteredFormat(backgroundColor,textFormat,horizontalAlignment)'}});
-      } else if(t==='TOT') {
-        requests.push(
-          {repeatCell:{range:rng(),cell:{userEnteredFormat:{backgroundColor:C.blueTot,textFormat:{bold:true,fontSize:10,foregroundColor:C.dark},horizontalAlignment:'CENTER'}},fields:'userEnteredFormat(backgroundColor,textFormat,horizontalAlignment)'}},
-          {updateBorders:{range:rng(),top:{style:'SOLID_MEDIUM',color:C.navy},bottom:{style:'SOLID_MEDIUM',color:C.navy}}}
-        );
-      } else if(t==='D') {
-        const bg = dataIdx++%2===0?C.white:C.lgray;
-        requests.push(
-          {repeatCell:{range:rng(),cell:{userEnteredFormat:{backgroundColor:bg,textFormat:{fontSize:10,foregroundColor:C.dark}}},fields:'userEnteredFormat(backgroundColor,textFormat)'}},
-          {repeatCell:{range:rng(1),cell:{userEnteredFormat:{horizontalAlignment:'CENTER'}},fields:'userEnteredFormat(horizontalAlignment)'}}
-        );
-      }
-    });
-    // column widths: first col wider, rest standard
-    [220,...Array(nc-1).fill(120)].forEach((w,i)=>requests.push({updateDimensionProperties:{range:{sheetId:sid,dimension:'COLUMNS',startIndex:i,endIndex:i+1},properties:{pixelSize:w},fields:'pixelSize'}}));
-    // freeze top 2 rows
-    requests.push({updateSheetProperties:{properties:{sheetId:sid,gridProperties:{frozenRowCount:2}},fields:'gridProperties.frozenRowCount'}});
-  });
-  if(requests.length) await sheetsReq(token,'POST',`${SHEETS_BASE}/${sheetId}:batchUpdate`,{requests});
-}
+import { syncToAppsScript } from './lib/sheets.js';
 
 // Build sheet data (plain arrays + row type tags for formatting)
 function buildSheetsContent({months,goalSaved,goalTargets,goalsConfig,amexSubs,boaSubs,sortedKeys,billTemplates}) {
@@ -749,7 +660,7 @@ function buildSheetsContent({months,goalSaved,goalTargets,goalsConfig,amexSubs,b
 }
 
 // ── EXPORT TO EXCEL / GOOGLE SHEETS ──────────────────────────
-async function exportToSheets({months, goalSaved, goalTargets, goalsConfig, amexSubs, boaSubs, sortedKeys, billTemplates, mode='download', googleClientId=''}) {
+async function exportToSheets({months, goalSaved, goalTargets, goalsConfig, amexSubs, boaSubs, sortedKeys, billTemplates, mode='download', appsScriptUrl='', appsScriptSecret=''}) {
   const ExcelJS = (await import('exceljs')).default;
   const wb = new ExcelJS.Workbook();
   wb.creator='My Budget App'; wb.created=new Date();
@@ -1165,21 +1076,8 @@ async function exportToSheets({months, goalSaved, goalTargets, goalsConfig, amex
   const filename=`MyBudget_${year}_Report.xlsx`;
 
   if(mode==='sheets'){
-    const token=await getGoogleToken(googleClientId,'consent');
     const content=buildSheetsContent({months,goalSaved,goalTargets,goalsConfig,amexSubs,boaSubs,sortedKeys,billTemplates});
-    const sheetNames=content.map(s=>s.name);
-    let sid=googleSheetId, sheetUrl;
-    if(!sid){
-      const created=await createGoogleSheet(token,`MyBudget ${year}`,sheetNames);
-      sid=created.id; sheetUrl=created.url;
-    } else {
-      await clearSheetData(token,sid,sheetNames);
-      sheetUrl=`https://docs.google.com/spreadsheets/d/${sid}/edit`;
-    }
-    await writeSheetValues(token,sid,content);
-    await applySheetFormatting(token,sid,content);
-    window.open(sheetUrl,'_blank');
-    return {sheetId:sid, sheetUrl, token};
+    await syncToAppsScript(content, appsScriptUrl, appsScriptSecret);
   } else {
     const blob=new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
     const url=URL.createObjectURL(blob);
@@ -1204,11 +1102,10 @@ export default function App() {
   const [goalsConfig, setGoalsConfig]   = useState(DEF_GOALS);
   const [billTemplates, setBillTemplates] = useState(DEF_BILLS);
   const [paycheckLabels, setPaycheckLabels] = useState(DEF_PCHECKS);
-  const [googleClientId, setGoogleClientId] = useState("");
-  const [googleSheetId, setGoogleSheetId]   = useState("");
-  const [googleSheetUrl, setGoogleSheetUrl] = useState("");
-  const [syncStatus, setSyncStatus]         = useState("idle");
-  const [lastSync, setLastSync]             = useState(null);
+  const [appsScriptUrl, setAppsScriptUrl]     = useState("");
+  const [appsScriptSecret, setAppsScriptSecret] = useState("");
+  const [syncStatus, setSyncStatus]           = useState("idle");
+  const [lastSync, setLastSync]               = useState(null);
 
   const T = themeMode === "dark" ? DARK : LIGHT;
 
@@ -1220,7 +1117,7 @@ export default function App() {
           window.storage.get("goalTargets_v2"), window.storage.get("currentKey_v2"),
           window.storage.get("themeMode"), window.storage.get("amexSubs_v1"),
           window.storage.get("boaSubs_v1"), window.storage.get("goalsConfig_v1"),
-          window.storage.get("billTemplates_v1"), window.storage.get("paycheckLabels_v1"), window.storage.get("googleClientId"),
+          window.storage.get("billTemplates_v1"), window.storage.get("paycheckLabels_v1"),
         ]);
         if (r1.status==="fulfilled"&&r1.value) setMonths(JSON.parse(r1.value.value));
         if (r2.status==="fulfilled"&&r2.value) setGoalSaved(JSON.parse(r2.value.value));
@@ -1232,9 +1129,8 @@ export default function App() {
         if (r8.status==="fulfilled"&&r8.value) setGoalsConfig(JSON.parse(r8.value.value));
         if (r9.status==="fulfilled"&&r9.value) setBillTemplates(JSON.parse(r9.value.value));
         if (r10.status==="fulfilled"&&r10.value) setPaycheckLabels(JSON.parse(r10.value.value));
-        const r11=await window.storage.get("googleClientId"); if(r11?.value) setGoogleClientId(r11.value);
-        const r12=await window.storage.get("googleSheetId");  if(r12?.value) setGoogleSheetId(r12.value);
-        const r13=await window.storage.get("googleSheetUrl"); if(r13?.value) setGoogleSheetUrl(r13.value);
+        const r11=await window.storage.get("appsScriptUrl");    if(r11?.value) setAppsScriptUrl(r11.value);
+        const r12=await window.storage.get("appsScriptSecret"); if(r12?.value) setAppsScriptSecret(r12.value);
       } catch(_){}
       setLoaded(true);
     })();
@@ -1254,12 +1150,11 @@ export default function App() {
         await window.storage.set("goalsConfig_v1", JSON.stringify(goalsConfig));
         await window.storage.set("billTemplates_v1", JSON.stringify(billTemplates));
         await window.storage.set("paycheckLabels_v1", JSON.stringify(paycheckLabels));
-        await window.storage.set("googleClientId", googleClientId);
-        await window.storage.set("googleSheetId",  googleSheetId);
-        await window.storage.set("googleSheetUrl", googleSheetUrl);
+        await window.storage.set("appsScriptUrl",    appsScriptUrl);
+        await window.storage.set("appsScriptSecret", appsScriptSecret);
       } catch(_){}
     })();
-  },[months,goalSaved,goalTargets,currentKey,themeMode,amexSubs,boaSubs,goalsConfig,billTemplates,paycheckLabels,googleClientId,googleSheetId,googleSheetUrl,loaded]);
+  },[months,goalSaved,goalTargets,currentKey,themeMode,amexSubs,boaSubs,goalsConfig,billTemplates,paycheckLabels,appsScriptUrl,appsScriptSecret,loaded]);
 
   const curMonth = months[currentKey] || newMonth(currentKey);
   const setCurMonth = useCallback((fn)=>{
@@ -1302,23 +1197,19 @@ export default function App() {
   };
 
   useEffect(()=>{
-    if(!googleSheetId||!googleClientId||!loaded||Object.keys(months).length===0) return;
+    if(!appsScriptUrl||!loaded||Object.keys(months).length===0) return;
     setSyncStatus('idle');
     const timer=setTimeout(async()=>{
       try{
         setSyncStatus('syncing');
-        const token=await getGoogleToken(googleClientId,'').catch(()=>null);
-        if(!token) return setSyncStatus('idle');
         const sKeys=Object.keys(months).sort().reverse();
         const content=buildSheetsContent({months,goalSaved,goalTargets,goalsConfig,amexSubs,boaSubs,sortedKeys:sKeys,billTemplates});
-        await clearSheetData(token,googleSheetId,content.map(s=>s.name));
-        await writeSheetValues(token,googleSheetId,content);
-        await applySheetFormatting(token,googleSheetId,content);
+        await syncToAppsScript(content, appsScriptUrl, appsScriptSecret);
         setSyncStatus('synced'); setLastSync(new Date());
       }catch(e){ setSyncStatus('error'); }
     },20000);
     return ()=>clearTimeout(timer);
-  },[months,goalSaved,goalTargets,googleSheetId,googleClientId,loaded]);
+  },[months,goalSaved,goalTargets,appsScriptUrl,appsScriptSecret,loaded]);
 
   if (!loaded) return (
     <div style={{minHeight:"100vh", background:T.bg, display:"flex", alignItems:"center", justifyContent:"center"}}>
@@ -1337,11 +1228,11 @@ export default function App() {
   const sortedKeys = Object.keys(months).sort().reverse();
 
   const screens = {
-    home:      <HomeScreen month={curMonth} goalSaved={goalSaved} goalTargets={goalTargets} goalsConfig={goalsConfig} onNewMonth={startNewMonth} currentKey={currentKey} months={months} sortedKeys={sortedKeys} isCurrentMonth={isCurrentMonth} onExport={async(mode)=>{const r=await exportToSheets({months,goalSaved,goalTargets,goalsConfig,amexSubs,boaSubs,sortedKeys,billTemplates,mode,googleClientId,googleSheetId});if(r?.sheetId&&r.sheetId!==googleSheetId){setGoogleSheetId(r.sheetId);setGoogleSheetUrl(r.sheetUrl||"");}}} googleClientId={googleClientId} />,
+    home:      <HomeScreen month={curMonth} goalSaved={goalSaved} goalTargets={goalTargets} goalsConfig={goalsConfig} onNewMonth={startNewMonth} currentKey={currentKey} months={months} sortedKeys={sortedKeys} isCurrentMonth={isCurrentMonth} onExport={async(mode)=>{await exportToSheets({months,goalSaved,goalTargets,goalsConfig,amexSubs,boaSubs,sortedKeys,billTemplates,mode,appsScriptUrl,appsScriptSecret});}} appsScriptUrl={appsScriptUrl} />,
     paychecks: <PaychecksScreen month={curMonth} setMonth={setCurMonth} />,
     cards:     <CardsScreen month={curMonth} setMonth={setCurMonth} amexSubs={amexSubs} boaSubs={boaSubs} />,
     goals:     <GoalsScreen goalSaved={goalSaved} setGoalSaved={setGoalSaved} goalTargets={goalTargets} setGoalTargets={setGoalTargets} onContribute={addContrib} currentMonth={curMonth} month={curMonth} setMonth={setCurMonth} goalsConfig={goalsConfig} />,
-    settings:  <SettingsScreen themeMode={themeMode} setThemeMode={setThemeMode} amexSubs={amexSubs} setAmexSubs={setAmexSubs} boaSubs={boaSubs} setBoaSubs={setBoaSubs} goalsConfig={goalsConfig} setGoalsConfig={setGoalsConfig} goalSaved={goalSaved} setGoalSaved={setGoalSaved} goalTargets={goalTargets} setGoalTargets={setGoalTargets} billTemplates={billTemplates} setBillTemplates={setBillTemplates} paycheckLabels={paycheckLabels} setPaycheckLabels={setPaycheckLabels} setMonths={setMonths} googleClientId={googleClientId} setGoogleClientId={setGoogleClientId} googleSheetId={googleSheetId} googleSheetUrl={googleSheetUrl} onResetSheet={()=>{setGoogleSheetId("");setGoogleSheetUrl("");}} syncStatus={syncStatus} lastSync={lastSync}/>,
+    settings:  <SettingsScreen themeMode={themeMode} setThemeMode={setThemeMode} amexSubs={amexSubs} setAmexSubs={setAmexSubs} boaSubs={boaSubs} setBoaSubs={setBoaSubs} goalsConfig={goalsConfig} setGoalsConfig={setGoalsConfig} goalSaved={goalSaved} setGoalSaved={setGoalSaved} goalTargets={goalTargets} setGoalTargets={setGoalTargets} billTemplates={billTemplates} setBillTemplates={setBillTemplates} paycheckLabels={paycheckLabels} setPaycheckLabels={setPaycheckLabels} setMonths={setMonths} appsScriptUrl={appsScriptUrl} setAppsScriptUrl={setAppsScriptUrl} appsScriptSecret={appsScriptSecret} setAppsScriptSecret={setAppsScriptSecret} onDisconnect={()=>{setAppsScriptUrl("");setAppsScriptSecret("");}} syncStatus={syncStatus} lastSync={lastSync}/>,
   };
 
   return (
@@ -1392,7 +1283,7 @@ export default function App() {
 }
 
 // ── HOME SCREEN ───────────────────────────────────────────────
-function HomeScreen({month, goalSaved, goalTargets, goalsConfig, onNewMonth, currentKey, months, sortedKeys, isCurrentMonth, onExport, googleClientId}) {
+function HomeScreen({month, goalSaved, goalTargets, goalsConfig, onNewMonth, currentKey, months, sortedKeys, isCurrentMonth, onExport, appsScriptUrl}) {
   const [exporting, setExporting] = useState(null); // null | 'xlsx' | 'sheets'
   const handleExport = async (mode) => {
     setExporting(mode);
@@ -1602,20 +1493,20 @@ function HomeScreen({month, goalSaved, goalTargets, goalsConfig, onNewMonth, cur
       {/* ── Export Buttons ── */}
       {sortedKeys.length > 0 && (
         <div style={{display:"flex", gap:8, marginBottom:12}}>
-          {/* Google Sheets — direct upload */}
-          <div onClick={()=>!exporting&&googleClientId&&handleExport('sheets')}
+          {/* Google Sheets — Apps Script sync */}
+          <div onClick={()=>!exporting&&appsScriptUrl&&handleExport('sheets')}
             style={{flex:2, display:"flex", alignItems:"center", justifyContent:"center", gap:8,
               background: T.mode==="dark"?"linear-gradient(135deg,#0f1e0f,#0f180f)":"linear-gradient(135deg,#F0FDF4,#E8F5E9)",
               border:`1px solid ${T.green}55`, borderRadius:16, padding:"13px 14px",
-              cursor:exporting||!googleClientId?"default":"pointer", opacity:!googleClientId?0.5:1,
+              cursor:exporting||!appsScriptUrl?"default":"pointer", opacity:!appsScriptUrl?0.5:1,
               boxShadow:T.cardShadow}}>
             {exporting==='sheets'
-              ? <div style={{color:T.green, fontSize:13, fontWeight:700}}>⏳ Uploading…</div>
+              ? <div style={{color:T.green, fontSize:13, fontWeight:700}}>⏳ Syncing…</div>
               : <>
                   <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke={T.green} strokeWidth="2" strokeLinecap="round"><path d="M12 2L12 15M12 2L8 6M12 2L16 6M3 19h18M3 15v4M21 15v4"/></svg>
                   <div>
-                    <div style={{color:T.green, fontSize:13, fontWeight:700}}>Open in Google Sheets</div>
-                    <div style={{color:T.muted, fontSize:10, marginTop:1}}>{googleClientId?"Uploads directly & opens":"Add Client ID in Settings first"}</div>
+                    <div style={{color:T.green, fontSize:13, fontWeight:700}}>Sync to Google Sheets</div>
+                    <div style={{color:T.muted, fontSize:10, marginTop:1}}>{appsScriptUrl?"Sends data to your sheet":"Add Apps Script URL in Settings"}</div>
                   </div>
                 </>
             }
@@ -2600,7 +2491,7 @@ function EditGoalsScreen({onBack, goalsConfig, setGoalsConfig, goalSaved, setGoa
 }
 
 // ── SETTINGS SCREEN ───────────────────────────────────────────
-function SettingsScreen({themeMode, setThemeMode, amexSubs, setAmexSubs, boaSubs, setBoaSubs, goalsConfig, setGoalsConfig, goalSaved, setGoalSaved, goalTargets, setGoalTargets, billTemplates, setBillTemplates, paycheckLabels, setPaycheckLabels, setMonths, googleClientId, setGoogleClientId, googleSheetId, googleSheetUrl, onResetSheet, syncStatus, lastSync}) {
+function SettingsScreen({themeMode, setThemeMode, amexSubs, setAmexSubs, boaSubs, setBoaSubs, goalsConfig, setGoalsConfig, goalSaved, setGoalSaved, goalTargets, setGoalTargets, billTemplates, setBillTemplates, paycheckLabels, setPaycheckLabels, setMonths, appsScriptUrl, setAppsScriptUrl, appsScriptSecret, setAppsScriptSecret, onDisconnect, syncStatus, lastSync}) {
   const T = useT();
   const [view, setView] = useState("main");
   const isDark = themeMode==="dark";
@@ -2623,33 +2514,26 @@ function SettingsScreen({themeMode, setThemeMode, amexSubs, setAmexSubs, boaSubs
       <SLabel>Google Sheets</SLabel>
       <Card>
         <div style={{padding:"14px 16px"}}>
-          <div style={{color:T.text, fontSize:14, fontWeight:600, marginBottom:4}}>Google OAuth Client ID</div>
+          <div style={{color:T.text, fontSize:14, fontWeight:600, marginBottom:4}}>Apps Script URL</div>
           <div style={{color:T.muted, fontSize:11, lineHeight:1.5, marginBottom:10}}>
-            Cloud Console → APIs &amp; Services → Credentials → OAuth 2.0 Client ID (Web app). Add <span style={{color:T.accent}}>{window.location.origin}</span> as authorized origin. Enable Google Sheets API.
+            Paste the web app URL from your deployed Apps Script. See <span style={{color:T.accent}}>apps-script/Code.gs</span> for setup instructions.
           </div>
-          <TxtInput value={googleClientId} onChange={setGoogleClientId} placeholder="xxxxxxxxxxxx.apps.googleusercontent.com"/>
-          {googleClientId && <div style={{color:T.green, fontSize:11, marginTop:6, fontWeight:600}}>✓ Client ID set</div>}
+          <TxtInput value={appsScriptUrl} onChange={setAppsScriptUrl} placeholder="https://script.google.com/macros/s/…/exec"/>
+          <div style={{color:T.text, fontSize:14, fontWeight:600, marginTop:14, marginBottom:4}}>Secret Token</div>
+          <TxtInput value={appsScriptSecret} onChange={setAppsScriptSecret} placeholder="your-secret-token"/>
+          {appsScriptUrl && (
+            <div style={{marginTop:12, display:"flex", justifyContent:"space-between", alignItems:"center"}}>
+              <div style={{color:T.muted, fontSize:10}}>
+                Auto-syncs 20 sec after changes ·{" "}
+                <span style={{color:syncStatus==="synced"?T.green:syncStatus==="syncing"?T.yellow:syncStatus==="error"?T.red:T.muted, fontWeight:600}}>
+                  {syncStatus==="synced"?("Synced "+(lastSync?lastSync.toLocaleTimeString():"")):syncStatus==="syncing"?"Syncing…":syncStatus==="error"?"Error":"Idle"}
+                </span>
+              </div>
+              <div onClick={onDisconnect} style={{color:T.red, fontSize:11, cursor:"pointer", padding:"4px 9px", background:`${T.red}14`, borderRadius:8, fontWeight:600}}>Disconnect</div>
+            </div>
+          )}
         </div>
       </Card>
-      {googleSheetId && (
-        <Card style={{border:`1px solid ${T.green}33`}}>
-          <div style={{padding:"14px 16px"}}>
-            <div style={{display:"flex", justifyContent:"space-between", alignItems:"flex-start", gap:12}}>
-              <div style={{flex:1}}>
-                <div style={{color:T.green, fontSize:13, fontWeight:700, marginBottom:4}}>✓ Linked Sheet</div>
-                <div style={{color:T.muted, fontSize:10, marginBottom:8}}>
-                  Auto-syncs 20 sec after changes · {" "}
-                  <span style={{color:syncStatus==="synced"?T.green:syncStatus==="syncing"?T.yellow:syncStatus==="error"?T.red:T.muted, fontWeight:600}}>
-                    {syncStatus==="synced"?("Synced "+(lastSync?lastSync.toLocaleTimeString():"")):syncStatus==="syncing"?"Syncing…":syncStatus==="error"?"Error":"Idle"}
-                  </span>
-                </div>
-                <a href={googleSheetUrl} target="_blank" rel="noreferrer" style={{color:T.accent, fontSize:12, fontWeight:600, textDecoration:"none"}}>Open Sheet ↗</a>
-              </div>
-              <div onClick={onResetSheet} style={{color:T.red, fontSize:11, cursor:"pointer", padding:"5px 10px", background:`${T.red}14`, borderRadius:8, fontWeight:600, flexShrink:0}}>Unlink</div>
-            </div>
-          </div>
-        </Card>
-      )}
 
       <SLabel>Appearance</SLabel>
       <Card>
