@@ -8,23 +8,23 @@ const todayKey = () => { const d=new Date(); return `${d.getFullYear()}-${String
 
 // ── THEME ─────────────────────────────────────────────────────
 const DARK = {
-  mode:"dark", bg:"#08080F", surface:"#0F0F1C", card:"#161625",
-  border:"rgba(255,255,255,0.07)", text:"#F0F0FF", sub:"rgba(255,255,255,0.52)",
-  muted:"rgba(255,255,255,0.3)", div:"rgba(255,255,255,0.06)",
-  inBg:"rgba(255,255,255,0.07)", inBorder:"rgba(255,255,255,0.13)",
-  tab:"rgba(8,8,15,0.97)", tabBorder:"rgba(255,255,255,0.07)",
-  accent:"#5B8FFF", green:"#32D74B", red:"#FF453A", yellow:"#FFD60A",
-  orange:"#FF9F0A", purple:"#BF5AF2", teal:"#5AC8FA",
-  shadow:"0 8px 40px rgba(0,0,0,0.6)", cardShadow:"0 2px 16px rgba(0,0,0,0.4)",
+  mode:"dark", bg:"#0d0f14", surface:"#13161e", card:"#13161e",
+  border:"#2a2f3d", text:"#eef0f6", sub:"#9aa0b8",
+  muted:"#555d78", div:"#2a2f3d",
+  inBg:"#1a1e29", inBorder:"#2a2f3d",
+  tab:"#13161e", tabBorder:"#2a2f3d",
+  accent:"#3b82f6", green:"#34d399", red:"#fb7185", yellow:"#fbbf24",
+  orange:"#fbbf24", purple:"#2dd4bf", teal:"#2dd4bf",
+  shadow:"0 20px 60px rgba(0,0,0,.5)", cardShadow:"0 2px 8px rgba(59,130,246,.08)",
 };
 const LIGHT = {
-  mode:"light", bg:"#F2F2F7", surface:"#FFFFFF", card:"#FFFFFF",
-  border:"rgba(0,0,0,0.06)", text:"#1C1C1E", sub:"#636366", muted:"#8E8E93",
-  div:"rgba(0,0,0,0.05)", inBg:"rgba(0,0,0,0.04)", inBorder:"rgba(0,0,0,0.13)",
-  tab:"rgba(255,255,255,0.98)", tabBorder:"rgba(0,0,0,0.08)",
-  accent:"#0071E3", green:"#34C759", red:"#FF3B30", yellow:"#FF9500",
-  orange:"#FF9500", purple:"#AF52DE", teal:"#32ADE6",
-  shadow:"0 2px 20px rgba(0,0,0,0.08)", cardShadow:"0 1px 8px rgba(0,0,0,0.06)",
+  mode:"light", bg:"#f0f2f8", surface:"#ffffff", card:"#ffffff",
+  border:"#dde0ee", text:"#0e1120", sub:"#5a6080", muted:"#9aa0b8",
+  div:"#dde0ee", inBg:"#f5f6fa", inBorder:"#dde0ee",
+  tab:"#ffffff", tabBorder:"#dde0ee",
+  accent:"#3b82f6", green:"#34d399", red:"#fb7185", yellow:"#fbbf24",
+  orange:"#fbbf24", purple:"#2dd4bf", teal:"#2dd4bf",
+  shadow:"0 20px 60px rgba(0,0,0,.5)", cardShadow:"0 2px 8px rgba(59,130,246,.07)",
 };
 
 const TC = createContext(DARK);
@@ -34,14 +34,14 @@ const useT = () => useContext(TC);
 function Card({children, style={}}) {
   const T = useT();
   return (
-    <div style={{background:T.card, borderRadius:20, border:`1px solid ${T.border}`, marginBottom:12, overflow:"hidden", boxShadow:T.cardShadow, ...style}}>
+    <div style={{background:T.card, borderRadius:16, border:`1px solid ${T.border}`, marginBottom:12, overflow:"hidden", boxShadow:T.cardShadow, ...style}}>
       {children}
     </div>
   );
 }
 function SLabel({children, style={}}) {
   const T = useT();
-  return <div style={{color:T.muted, fontSize:11, fontWeight:700, letterSpacing:1.1, textTransform:"uppercase", marginBottom:8, paddingLeft:2, marginTop:8, ...style}}>{children}</div>;
+  return <div style={{color:T.muted, fontSize:9, fontWeight:600, fontFamily:"var(--mono)", letterSpacing:"0.12em", textTransform:"uppercase", marginBottom:8, paddingLeft:2, marginTop:8, ...style}}>{children}</div>;
 }
 function Div() {
   const T = useT();
@@ -54,7 +54,7 @@ function MInput({value, onChange, placeholder="0.00", hi=false, sm=false}) {
     <div style={{position:"relative", display:"inline-flex", alignItems:"center"}}>
       <span style={{position:"absolute", left:9, color:col, fontSize:sm?11:13, fontWeight:700, pointerEvents:"none"}}>$</span>
       <input type="number" inputMode="decimal" value={value} onChange={e=>onChange(e.target.value)} placeholder={placeholder}
-        style={{background:hi?`${T.green}18`:T.inBg, border:`1.5px solid ${hi?`${T.green}45`:T.inBorder}`, borderRadius:11, color:hi?T.green:T.text, fontSize:sm?12:14, fontWeight:700, padding:sm?"5px 8px 5px 18px":"7px 10px 7px 20px", width:sm?85:105, textAlign:"right", outline:"none", fontFamily:"inherit"}} />
+        style={{background:hi?`${T.green}18`:T.inBg, border:`1.5px solid ${hi?`${T.green}45`:T.inBorder}`, borderRadius:11, color:hi?T.green:T.text, fontSize:16, fontWeight:700, padding:sm?"5px 8px 5px 18px":"7px 10px 7px 20px", width:sm?85:105, textAlign:"right", outline:"none", fontFamily:"var(--mono)"}} />
     </div>
   );
 }
@@ -85,10 +85,10 @@ function DonutChart({income, spent, saved, size=200}) {
       <svg width={size} height={size}>
         <defs>
           <linearGradient id="dg1" x1="0" y1="0" x2="1" y2="1">
-            <stop offset="0%" stopColor="#FF453A"/><stop offset="100%" stopColor="#FF9F0A"/>
+            <stop offset="0%" stopColor="#fb7185"/><stop offset="100%" stopColor="#fbbf24"/>
           </linearGradient>
           <linearGradient id="dg2" x1="0" y1="0" x2="1" y2="1">
-            <stop offset="0%" stopColor="#BF5AF2"/><stop offset="100%" stopColor="#5AC8FA"/>
+            <stop offset="0%" stopColor="#2dd4bf"/><stop offset="100%" stopColor="#3b82f6"/>
           </linearGradient>
         </defs>
         <circle cx={cx} cy={cy} r={r} fill="none" stroke={T.inBg} strokeWidth={sw}/>
@@ -97,9 +97,9 @@ function DonutChart({income, spent, saved, size=200}) {
         {seg(spentPct, 0, "url(#dg1)")}
       </svg>
       <div style={{position:"absolute", inset:0, display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", gap:1}}>
-        <div style={{color:T.muted, fontSize:9, fontWeight:700, letterSpacing:1}}>BALANCE</div>
-        <div style={{color:balColor, fontSize:income>0?26:20, fontWeight:800, letterSpacing:-1, lineHeight:1}}>{fmtS(balance)}</div>
-        {income>0 && <div style={{color:T.muted, fontSize:10, marginTop:2}}>{Math.round(Math.max(0,(income-spent-saved)/income)*100)}% left</div>}
+        <div style={{fontFamily:"var(--mono)", color:T.muted, fontSize:9, fontWeight:600, letterSpacing:"0.12em", textTransform:"uppercase"}}>Balance</div>
+        <div style={{fontFamily:"var(--mono)", background:"linear-gradient(135deg,#3b82f6,#0ea5e9)", WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent", backgroundClip:"text", fontSize:income>0?32:22, fontWeight:800, letterSpacing:-1, lineHeight:1}}>{fmtS(balance)}</div>
+        {income>0 && <div style={{fontFamily:"var(--mono)", color:T.muted, fontSize:10, marginTop:2}}>{Math.round(Math.max(0,(income-spent-saved)/income)*100)}% left</div>}
       </div>
     </div>
   );
@@ -231,8 +231,8 @@ function CategoryBars({categories}) {
               <span style={{color:c.color, fontSize:14, fontWeight:700}}>{fmt(c.amount)}</span>
             </div>
             <div style={{display:"flex", alignItems:"center", gap:8}}>
-              <div style={{flex:1, background:T.inBg, borderRadius:4, height:5, overflow:"hidden"}}>
-                <div style={{height:"100%", borderRadius:4, background:c.color, width:`${(c.amount/total)*100}%`, transition:"width 0.5s ease"}}/>
+              <div style={{flex:1, background:T.inBg, borderRadius:999, height:6, overflow:"hidden"}}>
+                <div style={{height:"100%", borderRadius:999, background:c.color, width:`${(c.amount/total)*100}%`, transition:"width 0.4s cubic-bezier(.4,0,.2,1)"}}/>
               </div>
               <span style={{color:T.muted, fontSize:10, fontWeight:600, minWidth:28, textAlign:"right"}}>{Math.round((c.amount/total)*100)}%</span>
             </div>
@@ -1110,6 +1110,11 @@ export default function App() {
   const T = themeMode === "dark" ? DARK : LIGHT;
 
   useEffect(()=>{
+    document.documentElement.setAttribute('data-theme', themeMode);
+    try { localStorage.setItem('budget_theme', themeMode); } catch(_){}
+  }, [themeMode]);
+
+  useEffect(()=>{
     (async()=>{
       try {
         const [r1,r2,r3,r4,r5,r6,r7,r8,r9,r10] = await Promise.allSettled([
@@ -1212,17 +1217,17 @@ export default function App() {
   },[months,goalSaved,goalTargets,appsScriptUrl,appsScriptSecret,loaded]);
 
   if (!loaded) return (
-    <div style={{minHeight:"100vh", background:T.bg, display:"flex", alignItems:"center", justifyContent:"center"}}>
+    <div style={{height:"100%", background:T.bg, display:"flex", alignItems:"center", justifyContent:"center"}}>
       <div style={{color:T.muted, fontSize:14}}>Loading...</div>
     </div>
   );
 
   const TABS = [
-    {key:"home",    label:"Home",     icon:a=><svg viewBox="0 0 24 24" fill={a?T.accent:T.muted} width="21" height="21"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg>},
-    {key:"paychecks",label:"Pay",    icon:a=><svg viewBox="0 0 24 24" fill={a?T.accent:T.muted} width="21" height="21"><path d="M11.8 10.9c-2.27-.59-3-1.2-3-2.15 0-1.09 1.01-1.85 2.7-1.85 1.78 0 2.44.85 2.5 2.1h2.21c-.07-1.72-1.12-3.3-3.21-3.81V3h-3v2.16c-1.94.42-3.5 1.68-3.5 3.61 0 2.31 1.91 3.46 4.7 4.13 2.5.6 3 1.48 3 2.41 0 .69-.49 1.79-2.7 1.79-2.06 0-2.87-.92-2.98-2.1h-2.2c.12 2.19 1.76 3.42 3.68 3.83V21h3v-2.15c1.95-.37 3.5-1.5 3.5-3.55 0-2.84-2.43-3.81-4.7-4.4z"/></svg>},
-    {key:"cards",   label:"Cards",    icon:a=><svg viewBox="0 0 24 24" fill={a?T.accent:T.muted} width="21" height="21"><path d="M20 4H4c-1.11 0-2 .89-2 2v12c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V6c0-1.11-.89-2-2-2zm0 14H4v-6h16v6zm0-10H4V6h16v2z"/></svg>},
-    {key:"goals",   label:"Goals",    icon:a=><svg viewBox="0 0 24 24" fill={a?T.accent:T.muted} width="21" height="21"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 14l-5-5 1.41-1.41L12 14.17l7.59-7.59L21 8l-9 9z"/></svg>},
-    {key:"settings",label:"Settings", icon:a=><svg viewBox="0 0 24 24" fill={a?T.accent:T.muted} width="21" height="21"><path d="M19.14,12.94c0.04-0.3,0.06-0.61,0.06-0.94c0-0.32-0.02-0.64-0.07-0.94l2.03-1.58c0.18-0.14,0.23-0.41,0.12-0.61 l-1.92-3.32c-0.12-0.22-0.37-0.29-0.59-0.22l-2.39,0.96c-0.5-0.38-1.03-0.7-1.62-0.94L14.4,2.81c-0.04-0.24-0.24-0.41-0.48-0.41 h-3.84c-0.24,0-0.43,0.17-0.47,0.41L9.25,5.35C8.66,5.59,8.12,5.92,7.63,6.29L5.24,5.33c-0.22-0.08-0.47,0-0.59,0.22L2.74,8.87 C2.62,9.08,2.66,9.34,2.86,9.48l2.03,1.58C4.84,11.36,4.8,11.69,4.8,12s0.02,0.64,0.07,0.94l-2.03,1.58 c-0.18,0.14-0.23,0.41-0.12,0.61l1.92,3.32c0.12,0.22,0.37,0.29,0.59,0.22l2.39-0.96c0.5,0.38,1.03,0.7,1.62,0.94l0.36,2.54 c0.05,0.24,0.24,0.41,0.48,0.41h3.84c0.24,0,0.44-0.17,0.47-0.41l0.36-2.54c0.59-0.24,1.13-0.56,1.62-0.94l2.39,0.96 c0.22,0.08,0.47,0,0.59-0.22l1.92-3.32c0.12-0.22,0.07-0.47-0.12-0.61L19.14,12.94z M12,15.6c-1.98,0-3.6-1.62-3.6-3.6 s1.62-3.6,3.6-3.6s3.6,1.62,3.6,3.6S13.98,15.6,12,15.6z"/></svg>},
+    {key:"home",    label:"Home",     icon:a=><svg viewBox="0 0 24 24" fill={a?"#fff":T.muted} width="21" height="21"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg>},
+    {key:"paychecks",label:"Pay",    icon:a=><svg viewBox="0 0 24 24" fill={a?"#fff":T.muted} width="21" height="21"><path d="M11.8 10.9c-2.27-.59-3-1.2-3-2.15 0-1.09 1.01-1.85 2.7-1.85 1.78 0 2.44.85 2.5 2.1h2.21c-.07-1.72-1.12-3.3-3.21-3.81V3h-3v2.16c-1.94.42-3.5 1.68-3.5 3.61 0 2.31 1.91 3.46 4.7 4.13 2.5.6 3 1.48 3 2.41 0 .69-.49 1.79-2.7 1.79-2.06 0-2.87-.92-2.98-2.1h-2.2c.12 2.19 1.76 3.42 3.68 3.83V21h3v-2.15c1.95-.37 3.5-1.5 3.5-3.55 0-2.84-2.43-3.81-4.7-4.4z"/></svg>},
+    {key:"cards",   label:"Cards",    icon:a=><svg viewBox="0 0 24 24" fill={a?"#fff":T.muted} width="21" height="21"><path d="M20 4H4c-1.11 0-2 .89-2 2v12c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V6c0-1.11-.89-2-2-2zm0 14H4v-6h16v6zm0-10H4V6h16v2z"/></svg>},
+    {key:"goals",   label:"Goals",    icon:a=><svg viewBox="0 0 24 24" fill={a?"#fff":T.muted} width="21" height="21"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 14l-5-5 1.41-1.41L12 14.17l7.59-7.59L21 8l-9 9z"/></svg>},
+    {key:"settings",label:"Settings", icon:a=><svg viewBox="0 0 24 24" fill={a?"#fff":T.muted} width="21" height="21"><path d="M19.14,12.94c0.04-0.3,0.06-0.61,0.06-0.94c0-0.32-0.02-0.64-0.07-0.94l2.03-1.58c0.18-0.14,0.23-0.41,0.12-0.61 l-1.92-3.32c-0.12-0.22-0.37-0.29-0.59-0.22l-2.39,0.96c-0.5-0.38-1.03-0.7-1.62-0.94L14.4,2.81c-0.04-0.24-0.24-0.41-0.48-0.41 h-3.84c-0.24,0-0.43,0.17-0.47,0.41L9.25,5.35C8.66,5.59,8.12,5.92,7.63,6.29L5.24,5.33c-0.22-0.08-0.47,0-0.59,0.22L2.74,8.87 C2.62,9.08,2.66,9.34,2.86,9.48l2.03,1.58C4.84,11.36,4.8,11.69,4.8,12s0.02,0.64,0.07,0.94l-2.03,1.58 c-0.18,0.14-0.23,0.41-0.12,0.61l1.92,3.32c0.12,0.22,0.37,0.29,0.59,0.22l2.39-0.96c0.5,0.38,1.03,0.7,1.62,0.94l0.36,2.54 c0.05,0.24,0.24,0.41,0.48,0.41h3.84c0.24,0,0.44-0.17,0.47-0.41l0.36-2.54c0.59-0.24,1.13-0.56,1.62-0.94l2.39,0.96 c0.22,0.08,0.47,0,0.59-0.22l1.92-3.32c0.12-0.22,0.07-0.47-0.12-0.61L19.14,12.94z M12,15.6c-1.98,0-3.6-1.62-3.6-3.6 s1.62-3.6,3.6-3.6s3.6,1.62,3.6,3.6S13.98,15.6,12,15.6z"/></svg>},
   ];
   const titles = {home:"Overview", paychecks:"My Paychecks", cards:"Cards & Bills", goals:"Savings Goals", settings:"Settings"};
   const sortedKeys = Object.keys(months).sort().reverse();
@@ -1237,8 +1242,8 @@ export default function App() {
 
   return (
     <TC.Provider value={T}>
-      <div style={{minHeight:"100vh", background:T.bg, display:"flex", justifyContent:"center", fontFamily:"'SF Pro Display',-apple-system,BlinkMacSystemFont,sans-serif", transition:"background 0.3s"}}>
-        <div style={{width:"100%", maxWidth:390, minHeight:"100vh", background:T.surface, display:"flex", flexDirection:"column"}}>
+      <div style={{height:"100%", background:T.bg, display:"flex", justifyContent:"center", fontFamily:"var(--sans)", transition:"background 0.3s"}}>
+        <div style={{width:"100%", maxWidth:390, height:"100%", background:T.surface, display:"flex", flexDirection:"column", fontFamily:"var(--sans)"}}>
           {/* Status bar */}
           <div style={{height:50, display:"flex", alignItems:"center", justifyContent:"space-between", padding:"0 22px", flexShrink:0}}>
             <span style={{color:T.text, fontSize:13, fontWeight:800}}>9:41</span>
@@ -1250,31 +1255,32 @@ export default function App() {
 
           {/* Header */}
           <div style={{padding:"2px 20px 14px", flexShrink:0}}>
-            <div style={{display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:2}}>
-              <button onClick={goToPrevMonth} style={{background:T.inBg, border:`1px solid ${T.border}`, borderRadius:10, padding:"5px 12px", color:T.text, fontSize:16, cursor:"pointer", lineHeight:1}}>‹</button>
+            <div style={{display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:6}}>
+              <button onClick={goToPrevMonth} className="tap-icon" style={{background:T.card, border:`1px solid ${T.border}`, borderRadius:"50%", width:32, height:32, display:"flex", alignItems:"center", justifyContent:"center", color:T.text, fontSize:16, lineHeight:1, boxShadow:T.cardShadow, flexShrink:0}}>‹</button>
               <div style={{display:"flex", flexDirection:"column", alignItems:"center"}}>
-                <div style={{color:T.muted, fontSize:12, fontWeight:600, letterSpacing:0.5}}>{monthLabel(currentKey)}</div>
-                {!isCurrentMonth&&<div style={{color:T.yellow, fontSize:9, fontWeight:700, letterSpacing:0.5, marginTop:1}}>EDITING PAST MONTH</div>}
+                <div style={{fontFamily:"var(--mono)", fontSize:10, fontWeight:600, letterSpacing:"0.15em", textTransform:"uppercase", background:"linear-gradient(135deg,#3b82f6,#0ea5e9)", WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent", backgroundClip:"text"}}>{monthLabel(currentKey)}</div>
+                {!isCurrentMonth&&<div style={{color:T.yellow, fontFamily:"var(--mono)", fontSize:9, fontWeight:700, letterSpacing:"0.1em", textTransform:"uppercase", marginTop:1}}>Editing Past Month</div>}
               </div>
-              <button onClick={goToNextMonth} disabled={isCurrentMonth} style={{background:T.inBg, border:`1px solid ${T.border}`, borderRadius:10, padding:"5px 12px", color:isCurrentMonth?T.muted:T.text, fontSize:16, cursor:isCurrentMonth?"default":"pointer", lineHeight:1}}>›</button>
+              <button onClick={goToNextMonth} disabled={isCurrentMonth} className="tap-icon" style={{background:T.card, border:`1px solid ${T.border}`, borderRadius:"50%", width:32, height:32, display:"flex", alignItems:"center", justifyContent:"center", color:isCurrentMonth?T.muted:T.text, fontSize:16, lineHeight:1, boxShadow:T.cardShadow, flexShrink:0}}>›</button>
             </div>
-            <div style={{color:T.text, fontSize:28, fontWeight:800, letterSpacing:-0.8, lineHeight:1.15}}>{titles[tab]}</div>
+            <div style={{color:T.text, fontSize:26, fontWeight:800, letterSpacing:-0.5, lineHeight:1.15}}>{titles[tab]}</div>
           </div>
 
-          <div style={{flex:1, overflowY:"auto", padding:"0 14px 90px"}}>{screens[tab]}</div>
+          <div className="scroll-content" style={{flex:1, overflowY:"auto", overscrollBehaviorY:"contain", WebkitOverflowScrolling:"touch", padding:"0 14px 90px"}}>{screens[tab]}</div>
 
           {/* Tab bar */}
-          <div style={{position:"sticky", bottom:0, background:T.tab, backdropFilter:"blur(24px)", borderTop:`1px solid ${T.tabBorder}`, display:"flex", padding:"10px 0 22px", flexShrink:0}}>
-            {TABS.map(({key,label,icon})=>{
-              const a=tab===key;
-              return (
-                <button key={key} onClick={()=>setTab(key)} style={{flex:1, background:"none", border:"none", cursor:"pointer", display:"flex", flexDirection:"column", alignItems:"center", gap:3, padding:"2px 0"}}>
-                  <div style={{transform:a?"scale(1.12)":"scale(1)", transition:"transform 0.18s"}}>{icon(a)}</div>
-                  <span style={{fontSize:9, fontWeight:a?700:500, color:a?T.accent:T.muted, letterSpacing:0.3}}>{label}</span>
-                  {a&&<div style={{width:4, height:4, borderRadius:2, background:T.accent, marginTop:1}}/>}
-                </button>
-              );
-            })}
+          <div style={{position:"sticky", bottom:0, background:T.tab, borderTop:`1px solid ${T.tabBorder}`, padding:"8px 14px 22px", flexShrink:0}}>
+            <div style={{display:"flex", background:T.card, border:`1px solid ${T.tabBorder}`, borderRadius:16, padding:"3px"}}>
+              {TABS.map(({key,label,icon})=>{
+                const a=tab===key;
+                return (
+                  <button key={key} onClick={()=>setTab(key)} style={{flex:1, background:a?"linear-gradient(135deg,#3b82f6 0%,#0ea5e9 100%)":"none", border:"none", cursor:"pointer", display:"flex", flexDirection:"column", alignItems:"center", gap:3, padding:"6px 4px", borderRadius:999, boxShadow:a?"0 2px 10px rgba(59,130,246,.35)":"none", transition:"all .15s"}}>
+                    <div>{icon(a)}</div>
+                    <span style={{fontSize:9, fontWeight:a?700:500, color:a?"#fff":T.muted, letterSpacing:"0.1em", fontFamily:"var(--mono)", textTransform:"uppercase"}}>{label}</span>
+                  </button>
+                );
+              })}
+            </div>
           </div>
         </div>
       </div>
@@ -1340,8 +1346,8 @@ function HomeScreen({month, goalSaved, goalTargets, goalsConfig, onNewMonth, cur
                 {label:"Saved",   val:goalOut,  color:T.purple, icon:"★"},
               ].map(({label,val,color,icon})=>(
                 <div key={label} style={{background:T.mode==="dark"?"rgba(255,255,255,0.06)":"rgba(255,255,255,0.7)", borderRadius:12, padding:"8px 12px"}}>
-                  <div style={{color:T.muted, fontSize:10, fontWeight:600, letterSpacing:0.5}}>{icon} {label.toUpperCase()}</div>
-                  <div style={{color, fontSize:16, fontWeight:800, marginTop:2}}>{fmtS(val)}</div>
+                  <div style={{fontFamily:"var(--mono)", color:T.muted, fontSize:9, fontWeight:600, letterSpacing:"0.12em", textTransform:"uppercase"}}>{icon} {label}</div>
+                  <div style={{fontFamily:"var(--mono)", color, fontSize:16, fontWeight:700, marginTop:2}}>{fmtS(val)}</div>
                 </div>
               ))}
             </div>
@@ -1351,7 +1357,7 @@ function HomeScreen({month, goalSaved, goalTargets, goalsConfig, onNewMonth, cur
             <div style={{marginTop:14, background:T.mode==="dark"?"rgba(255,159,10,0.12)":"rgba(255,149,0,0.1)", border:`1px solid ${T.yellow}44`, borderRadius:12, padding:"9px 12px", display:"flex", alignItems:"center", gap:8}}>
               <span style={{fontSize:14}}>⏳</span>
               <div>
-                <div style={{color:T.yellow, fontSize:12, fontWeight:700}}>{fmt(pendingBills)} in pending bills</div>
+                <div style={{fontFamily:"var(--mono)", color:T.yellow, fontSize:12, fontWeight:700}}>{fmt(pendingBills)} in pending bills</div>
                 <div style={{color:T.muted, fontSize:10, marginTop:1}}>Not yet deducted from balance</div>
               </div>
             </div>
@@ -1382,8 +1388,8 @@ function HomeScreen({month, goalSaved, goalTargets, goalsConfig, onNewMonth, cur
         ].map(({label,val,color},i,arr)=>(
           <div key={label}>
             <div style={{padding:"13px 16px", display:"flex", justifyContent:"space-between", alignItems:"center"}}>
-              <span style={{color:T.sub, fontSize:13}}>{label}</span>
-              <span style={{color, fontSize:15, fontWeight:800}}>{fmt(val)}</span>
+              <span style={{color:T.sub, fontSize:13, fontWeight:500}}>{label}</span>
+              <span style={{fontFamily:"var(--mono)", color, fontSize:15, fontWeight:700}}>{fmt(val)}</span>
             </div>
             {i<arr.length-1&&<Div/>}
           </div>
@@ -1396,12 +1402,12 @@ function HomeScreen({month, goalSaved, goalTargets, goalsConfig, onNewMonth, cur
         <div style={{padding:"16px 16px 8px"}}>
           <div style={{display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:16}}>
             <div>
-              <div style={{color:T.muted, fontSize:10, fontWeight:700, letterSpacing:0.8}}>ALL GOALS TOTAL</div>
-              <div style={{color:T.purple, fontSize:26, fontWeight:800}}>{fmt(totalGs)}</div>
+              <div style={{fontFamily:"var(--mono)", color:T.muted, fontSize:9, fontWeight:600, letterSpacing:"0.12em", textTransform:"uppercase"}}>All Goals Total</div>
+              <div style={{fontFamily:"var(--mono)", color:T.purple, fontSize:26, fontWeight:700}}>{fmt(totalGs)}</div>
             </div>
             <div style={{textAlign:"right"}}>
-              <div style={{color:T.muted, fontSize:10, fontWeight:700, letterSpacing:0.8}}>BILLS STATUS</div>
-              <div style={{color:allPaid?T.green:T.yellow, fontSize:16, fontWeight:800, marginTop:4}}>
+              <div style={{fontFamily:"var(--mono)", color:T.muted, fontSize:9, fontWeight:600, letterSpacing:"0.12em", textTransform:"uppercase"}}>Bills Status</div>
+              <div style={{fontFamily:"var(--mono)", color:allPaid?T.green:T.yellow, fontSize:16, fontWeight:700, marginTop:4}}>
                 {allPaid?"✅ All Clear":"⏳ Pending"}
               </div>
             </div>
@@ -1411,8 +1417,8 @@ function HomeScreen({month, goalSaved, goalTargets, goalsConfig, onNewMonth, cur
               const pct=Math.min((goalSaved[g.id]||0)/(goalTargets[g.id]||g.target),1);
               return (
                 <div key={g.id} style={{flex:1}}>
-                  <div style={{background:T.inBg, borderRadius:4, height:5, overflow:"hidden"}}>
-                    <div style={{height:"100%", borderRadius:4, background:g.color, width:`${pct*100}%`, transition:"width 0.4s"}}/>
+                  <div style={{background:T.inBg, borderRadius:999, height:6, overflow:"hidden"}}>
+                    <div style={{height:"100%", borderRadius:999, background:g.color, width:`${pct*100}%`, transition:"width 0.4s cubic-bezier(.4,0,.2,1)"}}/>
                   </div>
                   <div style={{color:T.muted, fontSize:8, marginTop:3, textAlign:"center"}}>{g.icon}</div>
                 </div>
@@ -1429,7 +1435,7 @@ function HomeScreen({month, goalSaved, goalTargets, goalsConfig, onNewMonth, cur
           <div style={{color:T.muted, fontSize:11, marginTop:4}}>Tap ➕ Start New Month on your current month to advance.</div>
         </div>
       ) : !month.locked ? (
-        <div onClick={onNewMonth} style={{background:"linear-gradient(135deg,#1a4fd6,#7c3aed)", borderRadius:16, padding:"16px", textAlign:"center", cursor:"pointer", marginBottom:12, boxShadow:"0 4px 20px rgba(91,143,255,0.35)"}}>
+        <div onClick={onNewMonth} style={{background:"linear-gradient(135deg,#3b82f6 0%,#0ea5e9 100%)", borderRadius:16, padding:"16px", textAlign:"center", cursor:"pointer", marginBottom:12, boxShadow:"0 4px 16px rgba(59,130,246,.35)"}}>
           <div style={{color:"#fff", fontSize:15, fontWeight:700}}>➕ Start New Month</div>
           <div style={{color:"rgba(255,255,255,0.6)", fontSize:11, marginTop:3}}>Saves this month & carries over balance</div>
         </div>
@@ -1445,22 +1451,22 @@ function HomeScreen({month, goalSaved, goalTargets, goalsConfig, onNewMonth, cur
         : "linear-gradient(135deg,#EEF2FF,#F5F0FF,#EDFCF2)",
         border:`1px solid ${T.accent}22`}}>
         <div style={{padding:"18px 18px 14px"}}>
-          <div style={{color:T.muted, fontSize:10, fontWeight:700, letterSpacing:1, marginBottom:4}}>TOTAL NET WORTH</div>
-          <div style={{color:T.text, fontSize:36, fontWeight:800, letterSpacing:-1.5, lineHeight:1, marginBottom:14}}>
+          <div style={{fontFamily:"var(--mono)", color:T.muted, fontSize:9, fontWeight:600, letterSpacing:"0.12em", textTransform:"uppercase", marginBottom:4}}>Total Net Worth</div>
+          <div style={{fontFamily:"var(--mono)", background:"linear-gradient(135deg,#3b82f6,#0ea5e9)", WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent", backgroundClip:"text", fontSize:34, fontWeight:800, letterSpacing:-0.6, lineHeight:1, marginBottom:14}}>
             {fmt(netWorth)}
           </div>
           <div style={{display:"flex", gap:8}}>
             <div style={{flex:1, background: T.mode==="dark"?"rgba(255,255,255,0.06)":"rgba(255,255,255,0.7)", borderRadius:12, padding:"10px 12px"}}>
-              <div style={{color:T.muted, fontSize:9, fontWeight:700, letterSpacing:0.8}}>IN GOALS</div>
-              <div style={{color:T.purple, fontSize:16, fontWeight:800, marginTop:2}}>{fmtS(totalGs)}</div>
+              <div style={{fontFamily:"var(--mono)", color:T.muted, fontSize:9, fontWeight:600, letterSpacing:"0.12em", textTransform:"uppercase"}}>In Goals</div>
+              <div style={{fontFamily:"var(--mono)", color:T.purple, fontSize:16, fontWeight:700, marginTop:2}}>{fmtS(totalGs)}</div>
             </div>
             <div style={{flex:1, background: T.mode==="dark"?"rgba(255,255,255,0.06)":"rgba(255,255,255,0.7)", borderRadius:12, padding:"10px 12px"}}>
-              <div style={{color:T.muted, fontSize:9, fontWeight:700, letterSpacing:0.8}}>CHECKING</div>
-              <div style={{color:leftover>=0?T.green:T.red, fontSize:16, fontWeight:800, marginTop:2}}>{fmtS(Math.max(0,leftover))}</div>
+              <div style={{fontFamily:"var(--mono)", color:T.muted, fontSize:9, fontWeight:600, letterSpacing:"0.12em", textTransform:"uppercase"}}>Checking</div>
+              <div style={{fontFamily:"var(--mono)", color:leftover>=0?T.green:T.red, fontSize:16, fontWeight:700, marginTop:2}}>{fmtS(Math.max(0,leftover))}</div>
             </div>
             <div style={{flex:1, background: T.mode==="dark"?"rgba(255,255,255,0.06)":"rgba(255,255,255,0.7)", borderRadius:12, padding:"10px 12px"}}>
-              <div style={{color:T.muted, fontSize:9, fontWeight:700, letterSpacing:0.8}}>SAVINGS RATE</div>
-              <div style={{color:savingsRate>=20?T.green:savingsRate>=10?T.yellow:T.red, fontSize:16, fontWeight:800, marginTop:2}}>{savingsRate}%</div>
+              <div style={{fontFamily:"var(--mono)", color:T.muted, fontSize:9, fontWeight:600, letterSpacing:"0.12em", textTransform:"uppercase"}}>Savings Rate</div>
+              <div style={{fontFamily:"var(--mono)", color:savingsRate>=20?T.green:savingsRate>=10?T.yellow:T.red, fontSize:16, fontWeight:700, marginTop:2}}>{savingsRate}%</div>
             </div>
           </div>
         </div>
@@ -1479,8 +1485,8 @@ function HomeScreen({month, goalSaved, goalTargets, goalsConfig, onNewMonth, cur
                   ["Total Saved",  totalSaved,  T.accent],
                 ].map(([l,v,c])=>(
                   <div key={l} style={{flex:1, background:T.inBg, borderRadius:10, padding:"8px 10px"}}>
-                    <div style={{color:T.muted, fontSize:9, fontWeight:700, letterSpacing:0.5}}>{l.toUpperCase()}</div>
-                    <div style={{color:c, fontSize:13, fontWeight:800, marginTop:2}}>{fmtS(v)}</div>
+                    <div style={{fontFamily:"var(--mono)", color:T.muted, fontSize:9, fontWeight:600, letterSpacing:"0.12em", textTransform:"uppercase"}}>{l}</div>
+                    <div style={{fontFamily:"var(--mono)", color:c, fontSize:13, fontWeight:700, marginTop:2}}>{fmtS(v)}</div>
                   </div>
                 ))}
               </div>
@@ -1529,7 +1535,7 @@ function HomeScreen({month, goalSaved, goalTargets, goalsConfig, onNewMonth, cur
 
       {/* ── History Accordion ── */}
       <div style={{marginBottom:12}}>
-        <div onClick={()=>setHistoryOpen(o=>!o)} style={{display:"flex", justifyContent:"space-between", alignItems:"center", background:T.card, border:`1px solid ${T.border}`, borderRadius:historyOpen?"16px 16px 0 0":"16px", padding:"14px 16px", cursor:"pointer", boxShadow:T.cardShadow}}>
+        <div onClick={()=>setHistoryOpen(o=>!o)} className="tap-row" style={{display:"flex", justifyContent:"space-between", alignItems:"center", background:T.card, border:`1px solid ${T.border}`, borderRadius:historyOpen?"16px 16px 0 0":"16px", padding:"14px 16px", cursor:"pointer", boxShadow:T.cardShadow}}>
           <div style={{display:"flex", alignItems:"center", gap:10}}>
             <div style={{width:34, height:34, borderRadius:10, background:T.inBg, display:"flex", alignItems:"center", justifyContent:"center"}}>
               <svg viewBox="0 0 24 24" fill={T.sub} width="16" height="16"><path d="M13 3c-4.97 0-9 4.03-9 9H1l3.89 3.89.07.14L9 12H6c0-3.87 3.13-7 7-7s7 3.13 7 7-3.13 7-7 7c-1.93 0-3.68-.79-4.94-2.06l-1.42 1.42C8.27 19.99 10.51 21 13 21c4.97 0 9-4.03 9-9s-4.03-9-9-9zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8H12z"/></svg>
@@ -1558,7 +1564,7 @@ function HomeScreen({month, goalSaved, goalTargets, goalsConfig, onNewMonth, cur
               const open=expanded===key;
               return (
                 <div key={key} style={{borderBottom:idx<sortedKeys.length-1?`1px solid ${T.div}`:"none"}}>
-                  <div onClick={()=>setExpanded(open?null:key)} style={{padding:"13px 16px", cursor:"pointer", display:"flex", justifyContent:"space-between", alignItems:"center"}}>
+                  <div onClick={()=>setExpanded(open?null:key)} className="tap-row" style={{padding:"13px 16px", cursor:"pointer", display:"flex", justifyContent:"space-between", alignItems:"center"}}>
                     <div>
                       <div style={{display:"flex", alignItems:"center", gap:6, marginBottom:2}}>
                         <span style={{color:T.text, fontSize:14, fontWeight:600}}>{monthLabel(key)}</span>
@@ -1568,7 +1574,7 @@ function HomeScreen({month, goalSaved, goalTargets, goalsConfig, onNewMonth, cur
                       <div style={{color:T.muted, fontSize:11}}>{inc>0?`Earned ${fmtS(inc)}`:isCur?"In progress…":"No data"}</div>
                     </div>
                     <div style={{textAlign:"right"}}>
-                      <div style={{color:net>=0?T.green:T.red, fontSize:15, fontWeight:800}}>{inc>0?fmt(net):"—"}</div>
+                      <div style={{fontFamily:"var(--mono)", color:net>=0?T.green:T.red, fontSize:15, fontWeight:700}}>{inc>0?fmt(net):"—"}</div>
                       <div style={{color:T.muted, fontSize:10}}>{open?"▲":"▼"}</div>
                     </div>
                   </div>
@@ -1576,8 +1582,8 @@ function HomeScreen({month, goalSaved, goalTargets, goalsConfig, onNewMonth, cur
                     <div style={{padding:"0 16px 14px", display:"grid", gridTemplateColumns:"1fr 1fr", gap:8}}>
                       {[["💰 Income",inc,T.green],["💳 Cards",cards,"#5B8FFF"],["🏠 Bills",bills,T.teal],["🏧 Direct",direct,T.orange],["🎯 Goals",gc,T.purple],["💵 Net",net,net>=0?T.green:T.red]].map(([l,v,c])=>(
                         <div key={l} style={{background:T.inBg, borderRadius:10, padding:"8px 10px"}}>
-                          <div style={{color:T.muted, fontSize:9, fontWeight:600}}>{l}</div>
-                          <div style={{color:c, fontSize:14, fontWeight:800}}>{fmt(v)}</div>
+                          <div style={{fontFamily:"var(--mono)", color:T.muted, fontSize:9, fontWeight:600, letterSpacing:"0.1em", textTransform:"uppercase"}}>{l}</div>
+                          <div style={{fontFamily:"var(--mono)", color:c, fontSize:14, fontWeight:700}}>{fmt(v)}</div>
                         </div>
                       ))}
                     </div>
@@ -1630,15 +1636,15 @@ function PaychecksScreen({month, setMonth}) {
                 <MInput value={p.amount} onChange={v=>upd(p.id,"amount",v)} hi={!!p.amount}/>
               </div>
               <input type="text" placeholder="Add a note…" value={p.note} onChange={e=>upd(p.id,"note",e.target.value)}
-                style={{background:T.inBg, border:`1px solid ${T.inBorder}`, borderRadius:9, color:T.sub, fontSize:12, padding:"6px 10px", width:"100%", outline:"none", fontFamily:"inherit", boxSizing:"border-box"}}/>
+                style={{background:T.inBg, border:`1px solid ${T.inBorder}`, borderRadius:9, color:T.sub, fontSize:16, padding:"6px 10px", width:"100%", outline:"none", fontFamily:"inherit", boxSizing:"border-box"}}/>
             </div>
             {i<arr.length-1&&<Div/>}
           </div>
         ))}
       </Card>
       <div style={{background:`${T.green}18`, border:`1px solid ${T.green}33`, borderRadius:14, padding:"12px 16px", marginBottom:12, display:"flex", justifyContent:"space-between", alignItems:"center"}}>
-        <span style={{color:T.sub, fontSize:13, fontWeight:600}}>Total Regular Pay</span>
-        <span style={{color:T.green, fontSize:20, fontWeight:800}}>{fmt(total)}</span>
+        <span style={{color:T.sub, fontSize:13, fontWeight:500}}>Total Regular Pay</span>
+        <span style={{fontFamily:"var(--mono)", color:T.green, fontSize:20, fontWeight:700}}>{fmt(total)}</span>
       </div>
 
       <SLabel>Verizon Commission</SLabel>
@@ -1724,11 +1730,11 @@ function CardEntry({ck, emoji, name, color, subs, month, togglePaid, updBal}) {
           {bal>0&&(
             <div style={{marginBottom:14}}>
               <div style={{display:"flex", justifyContent:"space-between", marginBottom:5}}>
-                <span style={{color:T.muted, fontSize:10, fontWeight:700, letterSpacing:0.6}}>LIMIT USAGE</span>
-                <span style={{color:isOver?T.red:isWarn?T.yellow:T.green, fontSize:10, fontWeight:700}}>{fmt(bal)} / ${LIMIT}</span>
+                <span style={{fontFamily:"var(--mono)", color:T.muted, fontSize:9, fontWeight:600, letterSpacing:"0.12em", textTransform:"uppercase"}}>Limit Usage</span>
+                <span style={{fontFamily:"var(--mono)", color:isOver?T.red:isWarn?T.yellow:T.green, fontSize:10, fontWeight:600}}>{fmt(bal)} / ${LIMIT}</span>
               </div>
-              <div style={{background:T.inBg, borderRadius:6, height:7, overflow:"hidden"}}>
-                <div style={{height:"100%", borderRadius:6, width:`${Math.min(pct*100,100)}%`, background:isOver?T.red:isWarn?T.yellow:T.green, transition:"width 0.4s"}}/>
+              <div style={{background:T.inBg, borderRadius:999, height:6, overflow:"hidden"}}>
+                <div style={{height:"100%", borderRadius:999, width:`${Math.min(pct*100,100)}%`, background:isOver?T.red:isWarn?T.yellow:"linear-gradient(135deg,#3b82f6,#0ea5e9)", boxShadow:isOver?"0 0 8px rgba(251,113,133,.45)":isWarn?"0 0 8px rgba(251,191,36,.45)":"0 0 8px rgba(59,130,246,.45)", transition:"width 0.4s cubic-bezier(.4,0,.2,1)"}}/>
               </div>
             </div>
           )}
@@ -1740,10 +1746,10 @@ function CardEntry({ck, emoji, name, color, subs, month, togglePaid, updBal}) {
             <div style={{position:"relative", display:"inline-flex", alignItems:"center"}}>
               <span style={{position:"absolute", left:9, color:T.green, fontSize:13, fontWeight:700, pointerEvents:"none"}}>$</span>
               <input type="number" inputMode="decimal" value={card.statementBalance||""} onChange={e=>updBal(ck,e.target.value)} placeholder="0.00"
-                style={{background:`${T.green}12`, border:`1.5px solid ${T.green}44`, borderRadius:11, color:T.green, fontSize:14, fontWeight:700, padding:"7px 10px 7px 20px", width:115, textAlign:"right", outline:"none", fontFamily:"inherit"}}/>
+                style={{background:`${T.green}12`, border:`1.5px solid ${T.green}44`, borderRadius:11, color:T.green, fontSize:16, fontWeight:700, padding:"7px 10px 7px 20px", width:115, textAlign:"right", outline:"none", fontFamily:"var(--mono)"}}/>
             </div>
           </div>
-          <div onClick={()=>togglePaid(ck)} style={{display:"flex", alignItems:"center", gap:10, cursor:"pointer", padding:"10px 12px", background:card.paid?`${T.green}14`:T.inBg, border:`1.5px solid ${card.paid?`${T.green}44`:T.inBorder}`, borderRadius:12, transition:"all 0.2s"}}>
+          <div onClick={()=>togglePaid(ck)} className="tap-row" style={{display:"flex", alignItems:"center", gap:10, cursor:"pointer", padding:"10px 12px", background:card.paid?`${T.green}14`:T.inBg, border:`1.5px solid ${card.paid?`${T.green}44`:T.inBorder}`, borderRadius:12, transition:"all 0.2s"}}>
             <div style={{width:22, height:22, borderRadius:11, background:card.paid?T.green:"transparent", border:card.paid?"none":`2px solid ${T.muted}`, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0, transition:"all 0.2s"}}>
               {card.paid&&<svg viewBox="0 0 24 24" fill="white" width="13" height="13"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>}
             </div>
@@ -1819,7 +1825,7 @@ function CardsScreen({month, setMonth, amexSubs, boaSubs}) {
           <div style={{color:T.muted, fontSize:11, marginBottom:12, lineHeight:1.5}}>Purchases made directly from your bank account</div>
           <div style={{display:"flex", gap:8, marginBottom:12, alignItems:"center"}}>
             <input type="text" placeholder="What was it?" value={newTxLabel} onChange={e=>setNewTxLabel(e.target.value)}
-              style={{flex:1, background:T.inBg, border:`1.5px solid ${T.inBorder}`, borderRadius:11, color:T.text, fontSize:13, padding:"8px 12px", outline:"none", fontFamily:"inherit"}}/>
+              style={{flex:1, background:T.inBg, border:`1.5px solid ${T.inBorder}`, borderRadius:11, color:T.text, fontSize:16, padding:"8px 12px", outline:"none", fontFamily:"inherit"}}/>
             <MInput value={newTxAmt} onChange={setNewTxAmt} placeholder="0.00"/>
             <div onClick={addDirectTx} style={{background:T.orange, borderRadius:11, padding:"8px 13px", cursor:"pointer", color:"#fff", fontSize:14, fontWeight:700, flexShrink:0}}>+</div>
           </div>
@@ -1852,7 +1858,7 @@ function CardsScreen({month, setMonth, amexSubs, boaSubs}) {
               <div style={{color:T.sub, fontSize:12, fontWeight:600}}>TOTAL PAID OUT</div>
               <div style={{color:T.muted, fontSize:11, marginTop:2}}>Cards + bills + direct</div>
             </div>
-            <div style={{color:T.red, fontSize:22, fontWeight:800}}>{fmt(aB+bB+fT+dT)}</div>
+            <div style={{fontFamily:"var(--mono)", color:T.red, fontSize:22, fontWeight:700}}>{fmt(aB+bB+fT+dT)}</div>
           </div>
           <div style={{display:"flex", gap:8}}>
             {[["💳 Amex",aB,"#5B8FFF",month.amex?.paid],["🏦 BOA",bB,T.yellow,month.boa?.paid],["🏠 Bills",fT,T.teal,month.bills.every(b=>b.paid)],["🏧 Direct",dT,T.orange,true]].map(([l,v,c,paid])=>(
@@ -1914,20 +1920,20 @@ function GCard({g, goalSaved, setGoalSaved, goalTargets, setGoalTargets, onContr
             {contrib>0&&!is401k&&<div style={{color:T.green, fontSize:10, fontWeight:700, marginTop:2}}>+{fmt(contrib)} this month</div>}
           </div>
           <div style={{textAlign:"right", marginLeft:8}}>
-            <div style={{color:done?T.green:g.color, fontSize:22, fontWeight:800}}>{Math.round(pct*100)}%</div>
-            <div style={{color:T.sub, fontSize:12, fontWeight:700}}>{fmt(saved)}</div>
+            <div style={{fontFamily:"var(--mono)", color:done?T.green:g.color, fontSize:22, fontWeight:700}}>{Math.round(pct*100)}%</div>
+            <div style={{fontFamily:"var(--mono)", color:T.sub, fontSize:12, fontWeight:600}}>{fmt(saved)}</div>
           </div>
         </div>
 
-        <div style={{background:T.inBg, borderRadius:8, height:9, marginBottom:14, overflow:"hidden"}}>
-          <div style={{height:"100%", borderRadius:8, width:`${pct*100}%`, transition:"width 0.5s",
+        <div style={{background:T.inBg, borderRadius:999, height:6, marginBottom:14, overflow:"hidden"}}>
+          <div style={{height:"100%", borderRadius:999, width:`${pct*100}%`, transition:"width 0.4s cubic-bezier(.4,0,.2,1)",
             background:done?T.green:g.type==="dream"?`linear-gradient(90deg,${g.color},${g.color}BB)`:g.color,
-            boxShadow:`0 0 10px ${g.color}55`}}/>
+            boxShadow:`0 0 8px ${g.color}55`}}/>
         </div>
 
         <div style={{display:"flex", justifyContent:"space-between", marginBottom:10}}>
-          <span style={{color:T.muted, fontSize:11}}>{fmt(saved)} of {fmt(target)}</span>
-          <span style={{color:T.muted, fontSize:11}}>{fmt(rem)} remaining</span>
+          <span style={{fontFamily:"var(--mono)", color:T.muted, fontSize:11}}>{fmt(saved)} of {fmt(target)}</span>
+          <span style={{fontFamily:"var(--mono)", color:T.muted, fontSize:11}}>{fmt(rem)} remaining</span>
         </div>
 
         {mode!=="idle"&&(
@@ -1941,7 +1947,7 @@ function GCard({g, goalSaved, setGoalSaved, goalTargets, setGoalTargets, onContr
                 <input type="number" inputMode="decimal" value={val} onChange={e=>setVal(e.target.value)}
                   onKeyDown={e=>e.key==="Enter"&&(mode==="add"?handleAdd:mode==="correct"?handleCorrect:handleEditTarget)()}
                   placeholder="0.00" autoFocus
-                  style={{width:"100%", textAlign:"right", outline:"none", fontFamily:"inherit", fontSize:15, fontWeight:700, padding:"9px 10px 9px 24px", borderRadius:11, border:`1.5px solid ${inputCol}55`, background:`${inputCol}14`, color:inputCol}}/>
+                  style={{width:"100%", textAlign:"right", outline:"none", fontFamily:"var(--mono)", fontSize:16, fontWeight:700, padding:"9px 10px 9px 24px", borderRadius:11, border:`1.5px solid ${inputCol}55`, background:`${inputCol}14`, color:inputCol}}/>
               </div>
               <div onClick={mode==="add"?handleAdd:mode==="correct"?handleCorrect:handleEditTarget}
                 style={{padding:"9px 14px", borderRadius:10, cursor:"pointer", color:"#fff", fontSize:13, fontWeight:700, whiteSpace:"nowrap", background:inputCol}}>
@@ -1974,7 +1980,7 @@ function GCard({g, goalSaved, setGoalSaved, goalTargets, setGoalTargets, onContr
         </div>
 
         {isCamaro&&camaroOpen&&camaroProps&&(
-          <div style={{marginTop:14, background:T.mode==="dark"?"#f5f5f5":"#f5f5f7", borderRadius:14, padding:"16px"}}>
+          <div style={{marginTop:14, animation:"slideUp .28s cubic-bezier(.32,1,.24,1)"}}>
             {camaroProps}
           </div>
         )}
@@ -2018,50 +2024,50 @@ function GoalsScreen({goalSaved, setGoalSaved, goalTargets, setGoalTargets, onCo
   const camaroTracker = (
     <div>
       <div style={{marginBottom:14}}>
-        <div style={{fontSize:10, fontWeight:700, color:"#aaa", letterSpacing:1.5, textTransform:"uppercase", marginBottom:8}}>Down Payment Goal</div>
+        <div style={{fontFamily:"var(--mono)", fontSize:9, fontWeight:600, color:T.muted, letterSpacing:"0.12em", textTransform:"uppercase", marginBottom:8}}>Down Payment Goal</div>
         <div style={{display:"flex", gap:8}}>
           {[10000,15000].map(gv=>(
-            <button key={gv} onClick={()=>setCamaroGoal(gv)} style={{flex:1, padding:"9px", border:`2px solid ${camaroGoal===gv?"#ff2200":"#e0e0e0"}`, borderRadius:8, background:camaroGoal===gv?"#fff5f5":"#fff", fontSize:13, fontWeight:800, color:camaroGoal===gv?"#ff2200":"#999", cursor:"pointer"}}>
+            <button key={gv} onClick={()=>setCamaroGoal(gv)} style={{flex:1, padding:"9px", border:`2px solid ${camaroGoal===gv?T.yellow:T.border}`, borderRadius:10, background:camaroGoal===gv?`${T.yellow}18`:T.inBg, fontSize:13, fontWeight:800, color:camaroGoal===gv?T.yellow:T.muted, cursor:"pointer"}}>
               ${gv===10000?"10,000":"15,000"}
             </button>
           ))}
         </div>
       </div>
       <div style={{marginBottom:14}}>
-        <div style={{fontSize:10, fontWeight:700, color:"#aaa", letterSpacing:1.5, textTransform:"uppercase", marginBottom:8}}>Saving Approach</div>
+        <div style={{fontFamily:"var(--mono)", fontSize:9, fontWeight:600, color:T.muted, letterSpacing:"0.12em", textTransform:"uppercase", marginBottom:8}}>Saving Approach</div>
         <div style={{display:"flex", gap:8}}>
-          {[["aggressive","🔥 Aggressive","30%","#ff2200"],["slow","🐢 Steady","10%","#2563eb"]].map(([md,label,pctLbl,col])=>(
-            <button key={md} onClick={()=>setCamaroMode(md)} style={{flex:1, padding:"9px 6px", border:`2px solid ${camaroMode===md?col:"#e0e0e0"}`, borderRadius:8, background:camaroMode===md?col+"18":"#fff", fontSize:12, fontWeight:800, color:camaroMode===md?col:"#999", cursor:"pointer", textAlign:"center"}}>
+          {[["aggressive","🔥 Aggressive","30%",T.red],["slow","🐢 Steady","10%",T.accent]].map(([md,label,pctLbl,col])=>(
+            <button key={md} onClick={()=>setCamaroMode(md)} style={{flex:1, padding:"9px 6px", border:`2px solid ${camaroMode===md?col:T.border}`, borderRadius:10, background:camaroMode===md?`${col}18`:T.inBg, fontSize:12, fontWeight:800, color:camaroMode===md?col:T.muted, cursor:"pointer", textAlign:"center"}}>
               {label}<br/><span style={{fontSize:10, fontWeight:400}}>{pctLbl} of leftover</span>
             </button>
           ))}
         </div>
       </div>
-      <div style={{background:"#fff", borderRadius:10, padding:"14px", marginBottom:14, boxShadow:"0 1px 4px rgba(0,0,0,0.06)"}}>
-        <div style={{fontSize:32, fontWeight:900, color:"#111"}}>{monthsToGo?monthsToGo+" months":"—"}</div>
-        <div style={{fontSize:11, color:"#aaa", marginTop:2, marginBottom:10}}>TO {fmtC(camaroGoal)} · {camaroMode==="aggressive"?"AGGRESSIVE 30%":"STEADY 10%"}</div>
-        <div style={{height:8, background:"#f0f0f0", borderRadius:4, overflow:"hidden", marginBottom:6}}>
-          <div style={{height:"100%", background:"linear-gradient(90deg,#ff2200,#ff6600)", borderRadius:4, width:`${Math.min(100,(camaroSaved/camaroGoal)*100)}%`, transition:"width 0.4s"}}/>
+      <div style={{background:T.card, border:`1px solid ${T.border}`, borderRadius:14, padding:"14px", marginBottom:14, boxShadow:T.cardShadow}}>
+        <div style={{fontSize:32, fontWeight:900, background:"linear-gradient(135deg,#fbbf24,#f59e0b)", WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent", backgroundClip:"text"}}>{monthsToGo?monthsToGo+" months":"—"}</div>
+        <div style={{fontFamily:"var(--mono)", fontSize:9, color:T.muted, letterSpacing:"0.12em", textTransform:"uppercase", marginTop:2, marginBottom:10}}>TO {fmtC(camaroGoal)} · {camaroMode==="aggressive"?"AGGRESSIVE 30%":"STEADY 10%"}</div>
+        <div style={{height:6, background:T.inBg, borderRadius:999, overflow:"hidden", marginBottom:6}}>
+          <div style={{height:"100%", background:"linear-gradient(135deg,#fbbf24,#f59e0b)", borderRadius:999, width:`${Math.min(100,(camaroSaved/camaroGoal)*100)}%`, transition:"width 0.4s cubic-bezier(.4,0,.2,1)", boxShadow:"0 0 8px rgba(251,191,36,.45)"}}/>
         </div>
-        <div style={{display:"flex", justifyContent:"space-between", fontSize:11, color:"#bbb"}}>
+        <div style={{display:"flex", justifyContent:"space-between", fontSize:11, fontFamily:"var(--mono)", color:T.muted}}>
           <span>{fmtC(camaroSaved)} saved</span><span>{fmtC(camaroGoal)} goal</span>
         </div>
-        {otherMonths&&<div style={{marginTop:8, fontSize:11, color:"#888", background:"#f9f9f9", borderRadius:6, padding:"6px 10px"}}>{camaroMode==="aggressive"?`🐢 Steady = ${otherMonths} months`:`🔥 Aggressive = ${otherMonths} months`}</div>}
+        {otherMonths&&<div style={{marginTop:8, fontSize:11, color:T.muted, background:T.inBg, borderRadius:8, padding:"6px 10px"}}>{camaroMode==="aggressive"?`🐢 Steady = ${otherMonths} months`:`🔥 Aggressive = ${otherMonths} months`}</div>}
       </div>
-      <div style={{background:"#fff", borderRadius:10, padding:"14px", boxShadow:"0 1px 4px rgba(0,0,0,0.06)"}}>
-        <div style={{fontSize:10, fontWeight:700, color:"#aaa", letterSpacing:1.5, textTransform:"uppercase", marginBottom:8}}>Log This Month's Save</div>
-        <div style={{fontSize:12, color:"#888", marginBottom:10}}>Recommended: <strong style={{color:"#ff2200"}}>{fmtC(recSave/2)}</strong> per paycheck</div>
+      <div style={{background:T.card, border:`1px solid ${T.border}`, borderRadius:14, padding:"14px", boxShadow:T.cardShadow}}>
+        <div style={{fontFamily:"var(--mono)", fontSize:9, fontWeight:600, color:T.muted, letterSpacing:"0.12em", textTransform:"uppercase", marginBottom:8}}>Log This Month's Save</div>
+        <div style={{fontSize:12, color:T.muted, marginBottom:10}}>Recommended: <strong style={{color:T.yellow}}>{fmtC(recSave/2)}</strong> per paycheck</div>
         <div style={{display:"flex", gap:8, alignItems:"center"}}>
           <div style={{position:"relative", flex:1}}>
-            <span style={{position:"absolute", left:9, top:"50%", transform:"translateY(-50%)", color:"#aaa", fontWeight:700, pointerEvents:"none"}}>$</span>
+            <span style={{position:"absolute", left:9, top:"50%", transform:"translateY(-50%)", color:T.muted, fontWeight:700, pointerEvents:"none"}}>$</span>
             <input type="number" value={saveAmt} onChange={e=>setSaveAmt(e.target.value)} placeholder={String(Math.round(recSave/2))}
-              style={{width:"100%", padding:"9px 9px 9px 22px", border:"2px solid #e0e0e0", borderRadius:8, fontSize:14, fontWeight:700, outline:"none", color:"#111"}}/>
+              style={{width:"100%", padding:"9px 9px 9px 22px", background:T.inBg, border:`1.5px solid ${T.border}`, borderRadius:10, fontSize:16, fontWeight:700, outline:"none", color:T.text, fontFamily:"var(--mono)"}}/>
           </div>
-          <button onClick={handleCamaroSave} style={{padding:"9px 14px", borderRadius:8, background:savedFlash?"#00aa55":"#ff2200", color:"#fff", fontSize:13, fontWeight:800, border:"none", cursor:"pointer", whiteSpace:"nowrap"}}>
+          <button onClick={handleCamaroSave} style={{padding:"9px 14px", borderRadius:10, background:savedFlash?T.green:"linear-gradient(135deg,#fbbf24,#f59e0b)", color:savedFlash?"#fff":"#1a1204", fontSize:13, fontWeight:800, border:"none", cursor:"pointer", whiteSpace:"nowrap"}}>
             {savedFlash?"✅ Done!":"Add to Goal"}
           </button>
         </div>
-        {savedFlash&&<div style={{marginTop:6, fontSize:11, color:"#00aa55", textAlign:"center", fontWeight:600}}>🎉 Camaro goal updated!</div>}
+        {savedFlash&&<div style={{marginTop:6, fontSize:11, color:T.green, textAlign:"center", fontWeight:600}}>🎉 Camaro goal updated!</div>}
       </div>
     </div>
   );
@@ -2072,16 +2078,16 @@ function GoalsScreen({goalSaved, setGoalSaved, goalTargets, setGoalTargets, onCo
         <div style={{padding:"16px"}}>
           <div style={{display:"flex", justifyContent:"space-between", alignItems:"flex-start"}}>
             <div>
-              <div style={{color:T.muted, fontSize:10, fontWeight:700, letterSpacing:0.8}}>ALL GOALS — TOTAL SAVED</div>
-              <div style={{color:T.purple, fontSize:28, fontWeight:800, marginTop:2}}>{fmt(totalSaved)}</div>
+              <div style={{fontFamily:"var(--mono)", color:T.muted, fontSize:9, fontWeight:600, letterSpacing:"0.12em", textTransform:"uppercase"}}>All Goals — Total Saved</div>
+              <div style={{fontFamily:"var(--mono)", background:"linear-gradient(135deg,#3b82f6,#0ea5e9)", WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent", backgroundClip:"text", fontSize:28, fontWeight:800, marginTop:2}}>{fmt(totalSaved)}</div>
             </div>
             <div style={{textAlign:"right"}}>
-              <div style={{color:T.muted, fontSize:10, fontWeight:700, letterSpacing:0.8}}>ALL GOALS TARGET</div>
-              <div style={{color:T.sub, fontSize:24, fontWeight:800, marginTop:2}}>{fmt(totalTarget)}</div>
+              <div style={{fontFamily:"var(--mono)", color:T.muted, fontSize:9, fontWeight:600, letterSpacing:"0.12em", textTransform:"uppercase"}}>All Goals Target</div>
+              <div style={{fontFamily:"var(--mono)", color:T.sub, fontSize:24, fontWeight:700, marginTop:2}}>{fmt(totalTarget)}</div>
             </div>
           </div>
-          <div style={{background:T.inBg, borderRadius:8, height:7, overflow:"hidden", marginTop:12}}>
-            <div style={{height:"100%", borderRadius:8, background:`linear-gradient(90deg,${T.purple},${T.accent})`, width:`${Math.min((totalSaved/totalTarget)*100,100)}%`, transition:"width 0.5s"}}/>
+          <div style={{background:T.inBg, borderRadius:999, height:6, overflow:"hidden", marginTop:12}}>
+            <div style={{height:"100%", borderRadius:999, background:"linear-gradient(135deg,#3b82f6,#0ea5e9)", width:`${Math.min((totalSaved/totalTarget)*100,100)}%`, transition:"width 0.4s cubic-bezier(.4,0,.2,1)", boxShadow:"0 0 8px rgba(59,130,246,.45)"}}/>
           </div>
           <div style={{display:"flex", justifyContent:"space-between", marginTop:6}}>
             <span style={{color:T.muted, fontSize:10}}>{fmt(totalSaved)} saved</span>
@@ -2113,7 +2119,7 @@ function GoalsScreen({goalSaved, setGoalSaved, goalTargets, setGoalTargets, onCo
 function SRow({icon, label, right, onClick, accent}) {
   const T = useT();
   return (
-    <div onClick={onClick} style={{display:"flex", alignItems:"center", gap:12, padding:"13px 16px", cursor:onClick?"pointer":"default"}}>
+    <div onClick={onClick} className={onClick?"tap-row":""} style={{display:"flex", alignItems:"center", gap:12, padding:"13px 16px", cursor:onClick?"pointer":"default"}}>
       <div style={{width:34, height:34, borderRadius:9, background:`${accent||T.accent}20`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:17, flexShrink:0}}>{icon}</div>
       <span style={{color:T.text, fontSize:15, fontWeight:500, flex:1}}>{label}</span>
       {right}
@@ -2135,7 +2141,7 @@ function Chevron() {
 function BackBtn({onBack, label}) {
   const T = useT();
   return (
-    <div onClick={onBack} style={{display:"flex", alignItems:"center", gap:6, cursor:"pointer", marginBottom:16, marginTop:4}}>
+    <div onClick={onBack} className="tap-row" style={{display:"flex", alignItems:"center", gap:6, cursor:"pointer", marginBottom:16, marginTop:4}}>
       <svg viewBox="0 0 24 24" fill="none" stroke={T.accent} strokeWidth="2.5" strokeLinecap="round" width="18" height="18"><path d="M15 18l-6-6 6-6"/></svg>
       <span style={{color:T.accent, fontSize:15, fontWeight:600}}>{label}</span>
     </div>
@@ -2145,7 +2151,7 @@ function TxtInput({value, onChange, placeholder=""}) {
   const T = useT();
   return (
     <input type="text" value={value} onChange={e=>onChange(e.target.value)} placeholder={placeholder}
-      style={{flex:1, background:T.inBg, border:`1.5px solid ${T.inBorder}`, borderRadius:10, color:T.text, fontSize:13, fontWeight:500, padding:"8px 11px", outline:"none", fontFamily:"inherit", minWidth:0}}/>
+      style={{flex:1, background:T.inBg, border:`1.5px solid ${T.inBorder}`, borderRadius:10, color:T.text, fontSize:16, fontWeight:500, padding:"8px 11px", outline:"none", fontFamily:"inherit", minWidth:0}}/>
   );
 }
 
@@ -2210,7 +2216,7 @@ function EditCardsScreen({onBack, amexSubs, setAmexSubs, boaSubs, setBoaSubs, bi
       <div style={{position:"relative", display:"inline-flex", alignItems:"center", flexShrink:0}}>
         <span style={{position:"absolute", left:7, color:color, fontSize:12, fontWeight:700, pointerEvents:"none"}}>$</span>
         <input type="number" value={item.amount} onChange={e=>onUpdate({...item,amount:parseFloat(e.target.value)||0})} placeholder="0"
-          style={{background:T.inBg, border:`1.5px solid ${T.inBorder}`, borderRadius:9, color:T.text, fontSize:13, fontWeight:700, padding:"7px 8px 7px 18px", width:80, textAlign:"right", outline:"none", fontFamily:"inherit"}}/>
+          style={{background:T.inBg, border:`1.5px solid ${T.inBorder}`, borderRadius:9, color:T.text, fontSize:16, fontWeight:700, padding:"7px 8px 7px 18px", width:80, textAlign:"right", outline:"none", fontFamily:"var(--mono)"}}/>
       </div>
       <div onClick={onRemove} style={{color:T.red, fontSize:18, cursor:"pointer", flexShrink:0}}>✕</div>
     </div>
@@ -2222,7 +2228,7 @@ function EditCardsScreen({onBack, amexSubs, setAmexSubs, boaSubs, setBoaSubs, bi
       <div style={{position:"relative", display:"inline-flex", alignItems:"center", flexShrink:0}}>
         <span style={{position:"absolute", left:7, color:color, fontSize:12, fontWeight:700, pointerEvents:"none"}}>$</span>
         <input type="number" value={state.amount} onChange={e=>setState(s=>({...s,amount:e.target.value}))} placeholder="0"
-          style={{background:T.inBg, border:`1.5px solid ${T.inBorder}`, borderRadius:9, color:T.text, fontSize:13, fontWeight:700, padding:"7px 8px 7px 18px", width:80, textAlign:"right", outline:"none", fontFamily:"inherit"}}/>
+          style={{background:T.inBg, border:`1.5px solid ${T.inBorder}`, borderRadius:9, color:T.text, fontSize:16, fontWeight:700, padding:"7px 8px 7px 18px", width:80, textAlign:"right", outline:"none", fontFamily:"var(--mono)"}}/>
       </div>
       <div onClick={onAdd} style={{background:color, borderRadius:9, padding:"7px 11px", cursor:"pointer", color:"#fff", fontWeight:700, fontSize:14, flexShrink:0}}>+</div>
     </div>
@@ -2280,7 +2286,7 @@ function EditCardsScreen({onBack, amexSubs, setAmexSubs, boaSubs, setBoaSubs, bi
               <div style={{position:"relative", display:"inline-flex", alignItems:"center", flexShrink:0}}>
                 <span style={{position:"absolute", left:7, color:T.green, fontSize:12, fontWeight:700, pointerEvents:"none"}}>$</span>
                 <input type="number" value={b.amount} onChange={e=>setBills(l=>l.map((x,j)=>j===i?{...x,amount:parseFloat(e.target.value)||0}:x))} placeholder="0"
-                  style={{background:T.inBg, border:`1.5px solid ${T.inBorder}`, borderRadius:9, color:T.text, fontSize:13, fontWeight:700, padding:"7px 8px 7px 18px", width:80, textAlign:"right", outline:"none", fontFamily:"inherit"}}/>
+                  style={{background:T.inBg, border:`1.5px solid ${T.inBorder}`, borderRadius:9, color:T.text, fontSize:16, fontWeight:700, padding:"7px 8px 7px 18px", width:80, textAlign:"right", outline:"none", fontFamily:"var(--mono)"}}/>
               </div>
               <div onClick={()=>setBills(l=>l.filter((_,j)=>j!==i))} style={{color:T.red, fontSize:18, cursor:"pointer", flexShrink:0}}>✕</div>
             </div>
@@ -2296,7 +2302,7 @@ function EditCardsScreen({onBack, amexSubs, setAmexSubs, boaSubs, setBoaSubs, bi
           <div style={{position:"relative", display:"inline-flex", alignItems:"center", flexShrink:0}}>
             <span style={{position:"absolute", left:7, color:T.green, fontSize:12, fontWeight:700, pointerEvents:"none"}}>$</span>
             <input type="number" value={newBill.amount} onChange={e=>setNewBill(s=>({...s,amount:e.target.value}))} placeholder="0"
-              style={{background:T.inBg, border:`1.5px solid ${T.inBorder}`, borderRadius:9, color:T.text, fontSize:13, fontWeight:700, padding:"7px 8px 7px 18px", width:80, textAlign:"right", outline:"none", fontFamily:"inherit"}}/>
+              style={{background:T.inBg, border:`1.5px solid ${T.inBorder}`, borderRadius:9, color:T.text, fontSize:16, fontWeight:700, padding:"7px 8px 7px 18px", width:80, textAlign:"right", outline:"none", fontFamily:"var(--mono)"}}/>
           </div>
           <div onClick={()=>{
             if(!newBill.label.trim()||!newBill.amount) return;
@@ -2370,7 +2376,7 @@ function EditGoalsScreen({onBack, goalsConfig, setGoalsConfig, goalSaved, setGoa
                 <div style={{position:"relative"}}>
                   <span style={{position:"absolute", left:8, top:"50%", transform:"translateY(-50%)", color:T.green, fontSize:12, fontWeight:700, pointerEvents:"none"}}>$</span>
                   <input type="number" value={g.target} onChange={e=>upd(g.id,"target",parseFloat(e.target.value)||0)} placeholder="0"
-                    style={{width:"100%", background:T.inBg, border:`1.5px solid ${T.inBorder}`, borderRadius:9, color:T.text, fontSize:13, fontWeight:700, padding:"7px 8px 7px 20px", outline:"none", fontFamily:"inherit"}}/>
+                    style={{width:"100%", background:T.inBg, border:`1.5px solid ${T.inBorder}`, borderRadius:9, color:T.text, fontSize:16, fontWeight:700, padding:"7px 8px 7px 20px", outline:"none", fontFamily:"var(--mono)"}}/>
                 </div>
               </div>
               <div style={{flex:1}}>
@@ -2378,7 +2384,7 @@ function EditGoalsScreen({onBack, goalsConfig, setGoalsConfig, goalSaved, setGoa
                 <div style={{position:"relative"}}>
                   <span style={{position:"absolute", left:8, top:"50%", transform:"translateY(-50%)", color:T.accent, fontSize:12, fontWeight:700, pointerEvents:"none"}}>$</span>
                   <input type="number" value={g.monthly} onChange={e=>upd(g.id,"monthly",parseFloat(e.target.value)||0)} placeholder="0"
-                    style={{width:"100%", background:T.inBg, border:`1.5px solid ${T.inBorder}`, borderRadius:9, color:T.text, fontSize:13, fontWeight:700, padding:"7px 8px 7px 20px", outline:"none", fontFamily:"inherit"}}/>
+                    style={{width:"100%", background:T.inBg, border:`1.5px solid ${T.inBorder}`, borderRadius:9, color:T.text, fontSize:16, fontWeight:700, padding:"7px 8px 7px 20px", outline:"none", fontFamily:"var(--mono)"}}/>
                 </div>
               </div>
               <div style={{flex:1}}>
@@ -2429,7 +2435,7 @@ function EditGoalsScreen({onBack, goalsConfig, setGoalsConfig, goalSaved, setGoa
                 <div style={{position:"relative"}}>
                   <span style={{position:"absolute", left:8, top:"50%", transform:"translateY(-50%)", color:T.green, fontSize:12, fontWeight:700, pointerEvents:"none"}}>$</span>
                   <input type="number" value={newG.target} onChange={e=>setNewG(s=>({...s,target:e.target.value}))} placeholder="0"
-                    style={{width:"100%", background:T.inBg, border:`1.5px solid ${T.inBorder}`, borderRadius:9, color:T.text, fontSize:13, fontWeight:700, padding:"7px 8px 7px 20px", outline:"none", fontFamily:"inherit"}}/>
+                    style={{width:"100%", background:T.inBg, border:`1.5px solid ${T.inBorder}`, borderRadius:9, color:T.text, fontSize:16, fontWeight:700, padding:"7px 8px 7px 20px", outline:"none", fontFamily:"var(--mono)"}}/>
                 </div>
               </div>
               <div style={{flex:1}}>
@@ -2437,7 +2443,7 @@ function EditGoalsScreen({onBack, goalsConfig, setGoalsConfig, goalSaved, setGoa
                 <div style={{position:"relative"}}>
                   <span style={{position:"absolute", left:8, top:"50%", transform:"translateY(-50%)", color:T.accent, fontSize:12, fontWeight:700, pointerEvents:"none"}}>$</span>
                   <input type="number" value={newG.monthly} onChange={e=>setNewG(s=>({...s,monthly:e.target.value}))} placeholder="0"
-                    style={{width:"100%", background:T.inBg, border:`1.5px solid ${T.inBorder}`, borderRadius:9, color:T.text, fontSize:13, fontWeight:700, padding:"7px 8px 7px 20px", outline:"none", fontFamily:"inherit"}}/>
+                    style={{width:"100%", background:T.inBg, border:`1.5px solid ${T.inBorder}`, borderRadius:9, color:T.text, fontSize:16, fontWeight:700, padding:"7px 8px 7px 20px", outline:"none", fontFamily:"var(--mono)"}}/>
                 </div>
               </div>
             </div>
