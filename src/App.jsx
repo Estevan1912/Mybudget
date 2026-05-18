@@ -98,7 +98,7 @@ function DonutChart({income, spent, saved, size=200}) {
       </svg>
       <div style={{position:"absolute", inset:0, display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", gap:1}}>
         <div style={{fontFamily:"var(--mono)", color:T.muted, fontSize:9, fontWeight:600, letterSpacing:"0.12em", textTransform:"uppercase"}}>Balance</div>
-        <div style={{fontFamily:"var(--mono)", background:"linear-gradient(135deg,#3b82f6,#0ea5e9)", WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent", backgroundClip:"text", fontSize:income>0?32:22, fontWeight:800, letterSpacing:-1, lineHeight:1}}>{fmtS(balance)}</div>
+        <div style={{fontFamily:"var(--mono)", background:"linear-gradient(135deg,#3b82f6,#0ea5e9)", WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent", backgroundClip:"text", fontSize:income>0?26:18, fontWeight:800, letterSpacing:-1, lineHeight:1}}>{fmt(balance)}</div>
         {income>0 && <div style={{fontFamily:"var(--mono)", color:T.muted, fontSize:10, marginTop:2}}>{Math.round(Math.max(0,(income-spent-saved)/income)*100)}% left</div>}
       </div>
     </div>

@@ -6,15 +6,131 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="My Budget" />
-    <meta name="theme-color" content="#0D0D16" />
+    <meta name="theme-color" content="#0d0f14" />
     <title>My Budget</title>
+    <link rel="manifest" href="/manifest.json">
+    <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+    <link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700;800&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <script>
+      (function(){
+        var t = localStorage.getItem('budget_theme') || 'dark';
+        document.documentElement.setAttribute('data-theme', t);
+      })();
+    </script>
     <style>
+      /* ── Design tokens ──────────────────────────── */
+      :root {
+        --bg:    #0d0f14;
+        --sf:    #13161e;
+        --s2:    #1a1e29;
+        --s3:    #222736;
+        --bd:    #2a2f3d;
+        --bd2:   #343a4d;
+        --tx:    #eef0f6;
+        --tx2:   #9aa0b8;
+        --tx3:   #555d78;
+        --c:     #3b82f6;
+        --c-d:   #2563eb;
+        --c-g:   linear-gradient(135deg, #3b82f6 0%, #0ea5e9 100%);
+        --green: #34d399;
+        --amber: #fbbf24;
+        --rose:  #fb7185;
+        --teal:  #2dd4bf;
+        --r-sm:  10px;
+        --r-md:  16px;
+        --r-lg:  22px;
+        --r-xl:  28px;
+        --sh-sm: 0 2px 8px rgba(59,130,246,.08);
+        --sh-md: 0 8px 24px rgba(0,0,0,.35);
+        --sh-lg: 0 20px 60px rgba(0,0,0,.5);
+        --sans:  'Geist', sans-serif;
+        --mono:  'Geist Mono', monospace;
+      }
+      [data-theme="light"] {
+        --bg:    #f0f2f8;
+        --sf:    #ffffff;
+        --s2:    #f5f6fa;
+        --s3:    #eceef5;
+        --bd:    #dde0ee;
+        --bd2:   #c8ccdf;
+        --tx:    #0e1120;
+        --tx2:   #5a6080;
+        --tx3:   #9aa0b8;
+        --sh-sm: 0 2px 8px rgba(59,130,246,.07);
+        --sh-md: 0 8px 24px rgba(59,130,246,.1);
+      }
+
+      /* ── Reset ──────────────────────────────────── */
       * { margin: 0; padding: 0; box-sizing: border-box; }
-      body { background: #0D0D16; overscroll-behavior: none; }
+
+      /* ── Mobile scroll lockdown ─────────────────── */
+      html, body {
+        position: fixed;
+        overflow: hidden;
+        overscroll-behavior: none;
+        width: 100%;
+        height: 100%;
+        -webkit-text-size-adjust: 100%;
+      }
+      body { background: var(--bg); font-family: var(--sans); color: var(--tx); }
+      #root { height: 100%; width: 100%; }
+
+      /* ── Scroll containers only ─────────────────── */
+      .scroll-content {
+        overflow-y: auto;
+        overscroll-behavior-y: contain;
+        -webkit-overflow-scrolling: touch;
+      }
+
+      /* ── Inputs ─────────────────────────────────── */
+      input, textarea, select { font-size: 16px !important; }
+      input:focus, textarea:focus {
+        outline: none;
+        border-color: var(--c) !important;
+        box-shadow: 0 0 0 3px rgba(59,130,246,.15) !important;
+      }
       input[type=number]::-webkit-inner-spin-button,
       input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+
+      /* ── Buttons ─────────────────────────────────── */
+      button {
+        touch-action: manipulation;
+        user-select: none;
+        -webkit-tap-highlight-color: transparent;
+        cursor: pointer;
+        transition: all .15s;
+      }
+      button:active { transform: scale(.97); }
+
+      /* ── Tappable rows (list items, card rows) ───── */
+      .tap-row {
+        touch-action: manipulation;
+        -webkit-tap-highlight-color: transparent;
+        transition: transform .15s;
+      }
+      .tap-row:active { transform: scale(.98); }
+
+      /* ── Circular icon buttons ───────────────────── */
+      .tap-icon {
+        touch-action: manipulation;
+        -webkit-tap-highlight-color: transparent;
+        transition: transform .15s;
+        cursor: pointer;
+      }
+      .tap-icon:active { transform: scale(.92); }
+
+      /* ── Animations ──────────────────────────────── */
+      @keyframes slideUp {
+        from { transform: translateY(24px); opacity: 0; }
+        to   { transform: translateY(0);    opacity: 1; }
+      }
+      @keyframes fadeIn {
+        from { opacity: 0; }
+        to   { opacity: 1; }
+      }
     </style>
-    <script type="module" crossorigin src="/assets/index-CJ0AdSPI.js"></script>
+    <script type="module" crossorigin src="/assets/index-jk3ueFjW.js"></script>
   </head>
   <body>
     <div id="root"></div>
