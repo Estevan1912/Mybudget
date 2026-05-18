@@ -1105,6 +1105,7 @@ export default function App() {
   const [appsScriptUrl, setAppsScriptUrl]     = useState("");
   const [appsScriptSecret, setAppsScriptSecret] = useState("");
   const [syncStatus, setSyncStatus]           = useState("idle");
+  const [syncError, setSyncError]             = useState("");
   const [lastSync, setLastSync]               = useState(null);
 
   const T = themeMode === "dark" ? DARK : LIGHT;
@@ -1213,7 +1214,7 @@ export default function App() {
         const content=buildSheetsContent({months,goalSaved,goalTargets,goalsConfig,amexSubs,boaSubs,sortedKeys:sKeys,billTemplates});
         await syncToAppsScript(content, appsScriptUrl, appsScriptSecret);
         setSyncStatus('synced'); setLastSync(new Date());
-      }catch(e){ setSyncStatus('error'); }
+      }catch(e){ setSyncStatus('error'); setSyncError(e.message||"Unknown error"); }
     },20000);
     return ()=>clearTimeout(timer);
   },[months,goalSaved,goalTargets,appsScriptUrl,appsScriptSecret,loaded]);
@@ -1239,7 +1240,7 @@ export default function App() {
     paychecks: <PaychecksScreen month={curMonth} setMonth={setCurMonth} />,
     cards:     <CardsScreen month={curMonth} setMonth={setCurMonth} amexSubs={amexSubs} boaSubs={boaSubs} />,
     goals:     <GoalsScreen goalSaved={goalSaved} setGoalSaved={setGoalSaved} goalTargets={goalTargets} setGoalTargets={setGoalTargets} onContribute={addContrib} currentMonth={curMonth} month={curMonth} setMonth={setCurMonth} goalsConfig={goalsConfig} />,
-    settings:  <SettingsScreen themeMode={themeMode} setThemeMode={setThemeMode} amexSubs={amexSubs} setAmexSubs={setAmexSubs} boaSubs={boaSubs} setBoaSubs={setBoaSubs} goalsConfig={goalsConfig} setGoalsConfig={setGoalsConfig} goalSaved={goalSaved} setGoalSaved={setGoalSaved} goalTargets={goalTargets} setGoalTargets={setGoalTargets} billTemplates={billTemplates} setBillTemplates={setBillTemplates} paycheckLabels={paycheckLabels} setPaycheckLabels={setPaycheckLabels} setMonths={setMonths} appsScriptUrl={appsScriptUrl} setAppsScriptUrl={setAppsScriptUrl} appsScriptSecret={appsScriptSecret} setAppsScriptSecret={setAppsScriptSecret} onDisconnect={()=>{setAppsScriptUrl("");setAppsScriptSecret("");}} syncStatus={syncStatus} lastSync={lastSync}/>,
+    settings:  <SettingsScreen themeMode={themeMode} setThemeMode={setThemeMode} amexSubs={amexSubs} setAmexSubs={setAmexSubs} boaSubs={boaSubs} setBoaSubs={setBoaSubs} goalsConfig={goalsConfig} setGoalsConfig={setGoalsConfig} goalSaved={goalSaved} setGoalSaved={setGoalSaved} goalTargets={goalTargets} setGoalTargets={setGoalTargets} billTemplates={billTemplates} setBillTemplates={setBillTemplates} paycheckLabels={paycheckLabels} setPaycheckLabels={setPaycheckLabels} setMonths={setMonths} appsScriptUrl={appsScriptUrl} setAppsScriptUrl={setAppsScriptUrl} appsScriptSecret={appsScriptSecret} setAppsScriptSecret={setAppsScriptSecret} onDisconnect={()=>{setAppsScriptUrl("");setAppsScriptSecret("");}} syncStatus={syncStatus} lastSync={lastSync} syncError={syncError}/>,
   };
 
   return (
@@ -2509,7 +2510,7 @@ function EditGoalsScreen({onBack, goalsConfig, setGoalsConfig, goalSaved, setGoa
 }
 
 // ── SETTINGS SCREEN ───────────────────────────────────────────
-function SettingsScreen({themeMode, setThemeMode, amexSubs, setAmexSubs, boaSubs, setBoaSubs, goalsConfig, setGoalsConfig, goalSaved, setGoalSaved, goalTargets, setGoalTargets, billTemplates, setBillTemplates, paycheckLabels, setPaycheckLabels, setMonths, appsScriptUrl, setAppsScriptUrl, appsScriptSecret, setAppsScriptSecret, onDisconnect, syncStatus, lastSync}) {
+function SettingsScreen({themeMode, setThemeMode, amexSubs, setAmexSubs, boaSubs, setBoaSubs, goalsConfig, setGoalsConfig, goalSaved, setGoalSaved, goalTargets, setGoalTargets, billTemplates, setBillTemplates, paycheckLabels, setPaycheckLabels, setMonths, appsScriptUrl, setAppsScriptUrl, appsScriptSecret, setAppsScriptSecret, onDisconnect, syncStatus, lastSync, syncError}) {
   const T = useT();
   const [view, setView] = useState("main");
   const isDark = themeMode==="dark";
@@ -2541,9 +2542,14 @@ function SettingsScreen({themeMode, setThemeMode, amexSubs, setAmexSubs, boaSubs
             <div style={{color:T.muted, fontSize:10}}>
               Auto-syncs 20 sec after changes ·{" "}
               <span style={{color:syncStatus==="synced"?T.green:syncStatus==="syncing"?T.yellow:syncStatus==="error"?T.red:T.muted, fontWeight:600}}>
-                {syncStatus==="synced"?("Synced "+(lastSync?lastSync.toLocaleTimeString():"")):syncStatus==="syncing"?"Syncing…":syncStatus==="error"?"Sync error":"Idle"}
+                {syncStatus==="synced"?("Synced "+(lastSync?lastSync.toLocaleTimeString():"")):syncStatus==="syncing"?"Syncing…":syncStatus==="error"?"Error":"Idle"}
               </span>
             </div>
+            {syncStatus==="error" && syncError && (
+              <div style={{marginTop:8, background:`${T.red}12`, border:`1px solid ${T.red}33`, borderRadius:8, padding:"7px 10px", color:T.red, fontSize:11, fontFamily:"var(--mono)", wordBreak:"break-all"}}>
+                {syncError}
+              </div>
+            )}
           </div>
         </Card>
       ) : (

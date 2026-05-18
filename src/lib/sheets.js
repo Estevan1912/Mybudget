@@ -1,10 +1,10 @@
 // Thin client for the MyBudget Apps Script web app.
-// The Apps Script URL accepts a JSON POST with { token, action, sheets }.
+// No Content-Type header — avoids CORS preflight that blocks Apps Script.
+// Apps Script reads e.postData.contents regardless of content-type.
 
 export async function syncToAppsScript(sheetsData, url, secret) {
   const res = await fetch(url, {
     method: "POST",
-    headers: {"Content-Type": "application/json"},
     body: JSON.stringify({token: secret, action: "sync", sheets: sheetsData}),
     redirect: "follow",
   });
