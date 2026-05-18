@@ -1135,7 +1135,9 @@ export default function App() {
         if (r9.status==="fulfilled"&&r9.value) setBillTemplates(JSON.parse(r9.value.value));
         if (r10.status==="fulfilled"&&r10.value) setPaycheckLabels(JSON.parse(r10.value.value));
         const r11=await window.storage.get("appsScriptUrl");    if(r11?.value) setAppsScriptUrl(r11.value);
-        const r12=await window.storage.get("appsScriptSecret"); if(r12?.value) setAppsScriptSecret(r12.value);
+        const r12=await window.storage.get("appsScriptSecret");
+        if(r12?.value) setAppsScriptSecret(r12.value);
+        else { const tok=[...Array(16)].map(()=>(Math.random()*36|0).toString(36)).join(''); setAppsScriptSecret(tok); }
       } catch(_){}
       setLoaded(true);
     })();
@@ -2154,6 +2156,16 @@ function TxtInput({value, onChange, placeholder=""}) {
       style={{flex:1, background:T.inBg, border:`1.5px solid ${T.inBorder}`, borderRadius:10, color:T.text, fontSize:16, fontWeight:500, padding:"8px 11px", outline:"none", fontFamily:"inherit", minWidth:0}}/>
   );
 }
+function TokenCopyBtn({token}) {
+  const T = useT();
+  const [copied, setCopied] = useState(false);
+  const copy = () => { navigator.clipboard?.writeText(token); setCopied(true); setTimeout(()=>setCopied(false), 1800); };
+  return (
+    <button onClick={copy} style={{background:copied?`${T.green}22`:`${T.accent}18`, border:`1px solid ${copied?T.green:T.accent}44`, borderRadius:8, color:copied?T.green:T.accent, fontSize:11, fontWeight:700, padding:"5px 10px", cursor:"pointer", flexShrink:0, transition:"all .2s"}}>
+      {copied ? "Copied!" : "Copy"}
+    </button>
+  );
+}
 
 // ── EDIT PAY SCREEN ───────────────────────────────────────────
 function EditPayScreen({onBack, paycheckLabels, setPaycheckLabels}) {
@@ -2518,28 +2530,57 @@ function SettingsScreen({themeMode, setThemeMode, amexSubs, setAmexSubs, boaSubs
       </Card>
 
       <SLabel>Google Sheets</SLabel>
-      <Card>
-        <div style={{padding:"14px 16px"}}>
-          <div style={{color:T.text, fontSize:14, fontWeight:600, marginBottom:4}}>Apps Script URL</div>
-          <div style={{color:T.muted, fontSize:11, lineHeight:1.5, marginBottom:10}}>
-            Paste the web app URL from your deployed Apps Script. See <span style={{color:T.accent}}>apps-script/Code.gs</span> for setup instructions.
-          </div>
-          <TxtInput value={appsScriptUrl} onChange={setAppsScriptUrl} placeholder="https://script.google.com/macros/s/…/exec"/>
-          <div style={{color:T.text, fontSize:14, fontWeight:600, marginTop:14, marginBottom:4}}>Secret Token</div>
-          <TxtInput value={appsScriptSecret} onChange={setAppsScriptSecret} placeholder="your-secret-token"/>
-          {appsScriptUrl && (
-            <div style={{marginTop:12, display:"flex", justifyContent:"space-between", alignItems:"center"}}>
-              <div style={{color:T.muted, fontSize:10}}>
-                Auto-syncs 20 sec after changes ·{" "}
-                <span style={{color:syncStatus==="synced"?T.green:syncStatus==="syncing"?T.yellow:syncStatus==="error"?T.red:T.muted, fontWeight:600}}>
-                  {syncStatus==="synced"?("Synced "+(lastSync?lastSync.toLocaleTimeString():"")):syncStatus==="syncing"?"Syncing…":syncStatus==="error"?"Error":"Idle"}
-                </span>
-              </div>
-              <div onClick={onDisconnect} style={{color:T.red, fontSize:11, cursor:"pointer", padding:"4px 9px", background:`${T.red}14`, borderRadius:8, fontWeight:600}}>Disconnect</div>
+      {appsScriptUrl ? (
+        <Card>
+          <div style={{padding:"14px 16px"}}>
+            <div style={{display:"flex", alignItems:"center", gap:8, marginBottom:8}}>
+              <div style={{width:8, height:8, borderRadius:"50%", background:T.green, flexShrink:0}}/>
+              <div style={{color:T.green, fontSize:13, fontWeight:700, flex:1}}>Connected</div>
+              <div className="tap-icon" onClick={onDisconnect} style={{color:T.red, fontSize:11, padding:"4px 9px", background:`${T.red}14`, borderRadius:8, fontWeight:600}}>Disconnect</div>
             </div>
-          )}
-        </div>
-      </Card>
+            <div style={{color:T.muted, fontSize:10}}>
+              Auto-syncs 20 sec after changes ·{" "}
+              <span style={{color:syncStatus==="synced"?T.green:syncStatus==="syncing"?T.yellow:syncStatus==="error"?T.red:T.muted, fontWeight:600}}>
+                {syncStatus==="synced"?("Synced "+(lastSync?lastSync.toLocaleTimeString():"")):syncStatus==="syncing"?"Syncing…":syncStatus==="error"?"Sync error":"Idle"}
+              </span>
+            </div>
+          </div>
+        </Card>
+      ) : (
+        <Card>
+          <div style={{padding:"16px"}}>
+            <div style={{color:T.text, fontSize:14, fontWeight:700, marginBottom:14}}>Connect in 4 steps</div>
+
+            {/* Token row */}
+            <div style={{background:T.inBg, border:`1.5px solid ${T.border}`, borderRadius:12, padding:"10px 14px", marginBottom:16}}>
+              <div style={{color:T.muted, fontSize:10, fontWeight:600, letterSpacing:"0.1em", textTransform:"uppercase", marginBottom:6}}>Your Secret Token</div>
+              <div style={{display:"flex", alignItems:"center", gap:8}}>
+                <div style={{flex:1, fontFamily:"var(--mono)", fontSize:13, fontWeight:700, color:T.accent, letterSpacing:"0.05em", wordBreak:"break-all"}}>{appsScriptSecret}</div>
+                <TokenCopyBtn token={appsScriptSecret}/>
+              </div>
+              <div style={{color:T.muted, fontSize:10, marginTop:6}}>You'll paste this into the script in step 3</div>
+            </div>
+
+            {/* Steps */}
+            {[
+              {n:1, title:"Create a new Google Sheet", body: <a href="https://sheets.new" target="_blank" rel="noreferrer" style={{color:T.accent, fontSize:12, fontWeight:600}}>sheets.new →</a>},
+              {n:2, title:"Open Extensions → Apps Script", body: <div style={{color:T.muted, fontSize:12, lineHeight:1.6}}>Delete all existing code, then paste the entire contents of <span style={{color:T.text, fontFamily:"var(--mono)", fontSize:11}}>apps-script/Code.gs</span> from your project.</div>},
+              {n:3, title:"Replace the token in the script", body: <div style={{color:T.muted, fontSize:12, lineHeight:1.6}}>Find the line <span style={{fontFamily:"var(--mono)", color:T.text, fontSize:11}}>SECRET_TOKEN = "YOUR_SECRET_TOKEN_HERE"</span> and replace <span style={{fontFamily:"var(--mono)", color:T.text, fontSize:11}}>YOUR_SECRET_TOKEN_HERE</span> with your token above. Then click <b style={{color:T.text}}>Deploy → New deployment → Web app</b>. Set Execute as: <b style={{color:T.text}}>Me</b>, Who has access: <b style={{color:T.text}}>Anyone</b>.</div>},
+              {n:4, title:"Paste the Web App URL below", body: <TxtInput value={appsScriptUrl} onChange={setAppsScriptUrl} placeholder="https://script.google.com/macros/s/…/exec"/>},
+            ].map(({n, title, body})=>(
+              <div key={n} style={{display:"flex", gap:12, marginBottom:16}}>
+                <div style={{width:24, height:24, borderRadius:"50%", background:`${T.accent}22`, border:`1.5px solid ${T.accent}55`, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0, marginTop:1}}>
+                  <span style={{color:T.accent, fontSize:11, fontWeight:800, fontFamily:"var(--mono)"}}>{n}</span>
+                </div>
+                <div style={{flex:1}}>
+                  <div style={{color:T.text, fontSize:13, fontWeight:600, marginBottom:4}}>{title}</div>
+                  {body}
+                </div>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
 
       <SLabel>Appearance</SLabel>
       <Card>

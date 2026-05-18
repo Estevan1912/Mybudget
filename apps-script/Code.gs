@@ -2,19 +2,17 @@
 // ║  MyBudget — Google Apps Script Backend                      ║
 // ╚══════════════════════════════════════════════════════════════╝
 //
-// SETUP (one-time):
-// 1. Create a new Google Spreadsheet and note its ID from the URL:
-//      https://docs.google.com/spreadsheets/d/SHEET_ID_HERE/edit
-// 2. Open Extensions → Apps Script in that sheet
-// 3. Replace SHEET_ID and SECRET_TOKEN below with your values
+// SETUP (one-time, ~2 minutes):
+// 1. Open Extensions → Apps Script inside your Google Sheet
+// 2. Delete all existing code and paste this entire file
+// 3. Replace YOUR_SECRET_TOKEN_HERE with the token shown in
+//    MyBudget → Settings → Google Sheets
 // 4. Deploy → New deployment → Web app
 //      Execute as: Me
 //      Who has access: Anyone
-// 5. Click Deploy, authorize the app, then copy the Web App URL
-// 6. Paste the Web App URL + your secret into MyBudget → Settings
+// 5. Copy the Web App URL and paste it into MyBudget → Settings
 
-const SHEET_ID    = "YOUR_SPREADSHEET_ID_HERE";
-const SECRET_TOKEN = "YOUR_SECRET_TOKEN_HERE"; // pick any random string
+const SECRET_TOKEN = "YOUR_SECRET_TOKEN_HERE";
 
 // ── doGet: returns all sheet data ────────────────────────────────
 function doGet(e) {
@@ -22,7 +20,7 @@ function doGet(e) {
     return json({error: "Unauthorized"});
   }
   try {
-    const ss = SpreadsheetApp.openById(SHEET_ID);
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
     const sheets = ss.getSheets().map(sheet => ({
       name: sheet.getName(),
       rows: sheet.getDataRange().getValues()
@@ -61,7 +59,7 @@ function doPost(e) {
 
 // ── syncSheets: write all sheet tabs ────────────────────────────
 function syncSheets(sheetsData) {
-  const ss = SpreadsheetApp.openById(SHEET_ID);
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
 
   sheetsData.forEach(({name, rows, types}) => {
     let sheet = ss.getSheetByName(name);
