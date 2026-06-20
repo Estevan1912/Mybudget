@@ -1235,12 +1235,27 @@ export default function App() {
   const titles = {home:"Overview", paychecks:"My Paychecks", cards:"Cards & Bills", goals:"Savings Goals", settings:"Settings"};
   const sortedKeys = Object.keys(months).sort().reverse();
 
+  const handleSaveBillTemplates = (newTemplates) => {
+    setBillTemplates(newTemplates);
+    setMonths(prev => {
+      const cur = prev[currentKey];
+      if (!cur || cur.locked) return prev;
+      const updatedBills = newTemplates.map((template, i) => {
+        const existing = cur.bills.find(b => b.label === template.label);
+        return existing
+          ? { ...template, id: existing.id, paid: existing.paid }
+          : { ...template, id: Date.now() + i, paid: false };
+      });
+      return { ...prev, [currentKey]: { ...cur, bills: updatedBills } };
+    });
+  };
+
   const screens = {
     home:      <HomeScreen month={curMonth} goalSaved={goalSaved} goalTargets={goalTargets} goalsConfig={goalsConfig} onNewMonth={startNewMonth} currentKey={currentKey} months={months} sortedKeys={sortedKeys} isCurrentMonth={isCurrentMonth} onExport={async(mode)=>{await exportToSheets({months,goalSaved,goalTargets,goalsConfig,amexSubs,boaSubs,sortedKeys,billTemplates,mode,appsScriptUrl,appsScriptSecret});}} appsScriptUrl={appsScriptUrl} />,
     paychecks: <PaychecksScreen month={curMonth} setMonth={setCurMonth} />,
     cards:     <CardsScreen month={curMonth} setMonth={setCurMonth} amexSubs={amexSubs} boaSubs={boaSubs} />,
     goals:     <GoalsScreen goalSaved={goalSaved} setGoalSaved={setGoalSaved} goalTargets={goalTargets} setGoalTargets={setGoalTargets} onContribute={addContrib} currentMonth={curMonth} month={curMonth} setMonth={setCurMonth} goalsConfig={goalsConfig} />,
-    settings:  <SettingsScreen themeMode={themeMode} setThemeMode={setThemeMode} amexSubs={amexSubs} setAmexSubs={setAmexSubs} boaSubs={boaSubs} setBoaSubs={setBoaSubs} goalsConfig={goalsConfig} setGoalsConfig={setGoalsConfig} goalSaved={goalSaved} setGoalSaved={setGoalSaved} goalTargets={goalTargets} setGoalTargets={setGoalTargets} billTemplates={billTemplates} setBillTemplates={setBillTemplates} paycheckLabels={paycheckLabels} setPaycheckLabels={setPaycheckLabels} setMonths={setMonths} appsScriptUrl={appsScriptUrl} setAppsScriptUrl={setAppsScriptUrl} appsScriptSecret={appsScriptSecret} setAppsScriptSecret={setAppsScriptSecret} onDisconnect={()=>{setAppsScriptUrl("");setAppsScriptSecret("");}} syncStatus={syncStatus} lastSync={lastSync} syncError={syncError}/>,
+    settings:  <SettingsScreen themeMode={themeMode} setThemeMode={setThemeMode} amexSubs={amexSubs} setAmexSubs={setAmexSubs} boaSubs={boaSubs} setBoaSubs={setBoaSubs} goalsConfig={goalsConfig} setGoalsConfig={setGoalsConfig} goalSaved={goalSaved} setGoalSaved={setGoalSaved} goalTargets={goalTargets} setGoalTargets={setGoalTargets} billTemplates={billTemplates} setBillTemplates={handleSaveBillTemplates} paycheckLabels={paycheckLabels} setPaycheckLabels={setPaycheckLabels} setMonths={setMonths} appsScriptUrl={appsScriptUrl} setAppsScriptUrl={setAppsScriptUrl} appsScriptSecret={appsScriptSecret} setAppsScriptSecret={setAppsScriptSecret} onDisconnect={()=>{setAppsScriptUrl("");setAppsScriptSecret("");}} syncStatus={syncStatus} lastSync={lastSync} syncError={syncError}/>,
   };
 
   return (
