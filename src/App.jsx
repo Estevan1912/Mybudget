@@ -275,6 +275,8 @@ const newMonth = (key, goals=DEF_GOALS, bills=DEF_BILLS, pchecks=DEF_PCHECKS) =>
   bills: bills.map((b,i)=>({...b,id:i+1,paid:false})),
   goalContributions: Object.fromEntries(goals.map(g=>[g.id,0])),
   directTransactions:[],
+  sideIncome:[],
+  notes:"",
 });
 
 // ── CANVAS CHART RENDERERS ────────────────────────────────────
@@ -487,7 +489,8 @@ function buildSheetsContent({months,goalSaved,goalTargets,goalsConfig,amexSubs,b
   const rows = [...sortedKeys].reverse().map(key=>{
     const m=months[key];
     const starting=cur(m.startingBalance),paychecks=m.paychecks.reduce((s,p)=>s+cur(p.amount),0),commission=cur(m.commission?.amount);
-    const totalIn=starting+paychecks+commission;
+    const sideInc=(m.sideIncome||[]).reduce((s,t)=>s+cur(t.amount),0);
+    const totalIn=starting+paychecks+commission+sideInc;
     const amex=m.amex?.paid?cur(m.amex?.statementBalance):0,boa=m.boa?.paid?cur(m.boa?.statementBalance):0;
     const bills=m.bills.filter(b=>b.paid).reduce((s,b)=>s+b.amount,0),direct=(m.directTransactions||[]).reduce((s,t)=>s+cur(t.amount),0);
     const savings=Object.entries(m.goalContributions||{}).filter(([id])=>!goalsConfig.find(g=>String(g.id)===id)?.preTax).reduce((s,[,v])=>s+cur(v),0);
@@ -659,8 +662,300 @@ function buildSheetsContent({months,goalSaved,goalTargets,goalsConfig,amexSubs,b
   return names.map((name,i)=>({name, rows:sheets[i].map(r=>r.r||['']), types:sheets[i].map(r=>r.t)}));
 }
 
+// ── BUILD DASHBOARD (for clipboard / CSV — raw numbers + SPARKLINE graphs) ──
+function buildDashboard({months, goalSaved, goalTargets, goalsConfig, amexSubs, boaSubs, sortedKeys, billTemplates}) {
+  const cur = n => isNaN(n)||n==null?0:+n;
+  const r2  = n => Math.round(cur(n)*100)/100;
+  const pct = (a,b) => b>0?Math.round((a/b)*100):0;
+  const now = new Date().toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'});
+  const year = new Date().getFullYear();
+  const clean = s => String(s||'').replace(/[^\x20-\x7E]/g,'').trim();
+
+  const mRows = [...sortedKeys].reverse().map(key=>{
+    const m=months[key];
+    const starting=cur(m.startingBalance), paychecks=m.paychecks.reduce((s,p)=>s+cur(p.amount),0), commission=cur(m.commission?.amount);
+    const sideInc=(m.sideIncome||[]).reduce((s,t)=>s+cur(t.amount),0);
+    const totalIn=starting+paychecks+commission+sideInc;
+    const amex=m.amex?.paid?cur(m.amex?.statementBalance):0, boa=m.boa?.paid?cur(m.boa?.statementBalance):0;
+    const bills=m.bills.filter(b=>b.paid).reduce((s,b)=>s+b.amount,0), direct=(m.directTransactions||[]).reduce((s,t)=>s+cur(t.amount),0);
+    const savings=Object.entries(m.goalContributions||{}).filter(([id])=>!goalsConfig.find(g=>String(g.id)===id)?.preTax).reduce((s,[,v])=>s+cur(v),0);
+    const expenses=amex+boa+bills+direct, balance=totalIn-expenses-savings, debt=amex+boa;
+    return {key,label:monthLabel(key),starting:r2(starting),paychecks:r2(paychecks),commission:r2(commission),totalIn:r2(totalIn),amex:r2(amex),boa:r2(boa),bills:r2(bills),direct:r2(direct),savings:r2(savings),expenses:r2(expenses),balance:r2(balance),debt:r2(debt),sRate:pct(savings,totalIn)};
+  });
+
+  const allIn=r2(mRows.reduce((s,r)=>s+r.totalIn,0)), allExp=r2(mRows.reduce((s,r)=>s+r.expenses,0)), allSav=r2(mRows.reduce((s,r)=>s+r.savings,0));
+  const allGT=r2(Object.values(goalSaved).reduce((s,v)=>s+cur(v),0));
+  const latest=mRows[mRows.length-1], prev=mRows.length>1?mRows[mRows.length-2]:null;
+  const lastBal=r2(latest?.balance||0), nw=r2(allGT+Math.max(0,lastBal));
+  const avgIn=mRows.length?r2(allIn/mRows.length):0, avgExp=mRows.length?r2(allExp/mRows.length):0, avgSav=mRows.length?r2(allSav/mRows.length):0;
+  const budBills=r2((billTemplates||[]).reduce((s,b)=>s+b.amount,0));
+  const budSubs=r2([...amexSubs,...boaSubs].reduce((s,x)=>s+x.amount,0));
+  const budSavings=r2(goalsConfig.reduce((s,g)=>s+g.monthly,0));
+  const budTotal=r2(budBills+budSubs+budSavings);
+  const bestMonth=mRows.reduce((b,r)=>r.totalIn>b.totalIn?r:b,mRows[0]||{totalIn:0,label:'--'});
+  const worstExpMonth=mRows.reduce((b,r)=>r.expenses>b.expenses?r:b,mRows[0]||{expenses:0,label:'--'});
+
+  const sparkLine = (vals,color) => vals.length<2?'':'=SPARKLINE({'+vals.join(',')+'},{"charttype","line";"linewidth",2;"color","'+(color||'#3b82f6')+'"})';
+  const sparkCol  = (vals,color) => vals.length<2?'':'=SPARKLINE({'+vals.join(',')+'},{"charttype","column";"color","'+(color||'#34d399')+'"})';
+  const sparkBar  = (ratio, c1, c2) => '=SPARKLINE('+Math.min(Math.max(ratio,0),1).toFixed(3)+',{"charttype","bar";"max",1;"color1","'+(c1||'#3b82f6')+'";"color2","'+(c2||'#e5e7eb')+'"})';
+  const sparkWL   = (vals) => vals.length<2?'':'=SPARKLINE({'+vals.join(',')+'},{"charttype","winloss";"color","#34d399";"negcolor","#fb7185"})';
+  const momChange = (curr,prev) => prev===0?'--':(curr>prev?'+':'')+r2(curr-prev);
+  const momPct    = (curr,prev) => prev===0?'--':(curr>=prev?'+':'')+pct(curr-prev,prev)+'%';
+  const status    = (curr,bud) => bud<=0?'--':curr<=bud*0.9?'ON TRACK':curr<=bud?'CLOSE':'OVER BUDGET';
+
+  const d = [];
+  const E = () => d.push([]);
+  const pad = (row, cols=12) => { while(row.length<cols) row.push(''); return row; };
+
+  // ═══════════════════════════════════════════════════════════
+  // HEADER
+  // ═══════════════════════════════════════════════════════════
+  d.push(pad(['MY BUDGET DASHBOARD','','','','','','','','','Updated: '+now]));
+  d.push(pad([year+' Financial Overview','','',mRows.length+' months tracked','','','','','','Figures in USD']));
+  E();
+
+  // ═══════════════════════════════════════════════════════════
+  // KEY PERFORMANCE INDICATORS
+  // ═══════════════════════════════════════════════════════════
+  d.push(pad(['KEY PERFORMANCE INDICATORS']));
+  d.push(pad(['NET WORTH','YTD INCOME','YTD EXPENSES','YTD SAVED','SAVINGS RATE','BALANCE','AVG MONTHLY IN','AVG MONTHLY OUT','BEST MONTH','INCOME TREND','EXPENSE TREND','SAVINGS TREND'],12));
+  d.push(pad([nw, allIn, allExp, allSav, pct(allSav,allIn)+'%', lastBal, avgIn, avgExp, bestMonth.label+': '+r2(bestMonth.totalIn),
+    sparkCol(mRows.map(r=>r.totalIn),'#34d399'),
+    sparkCol(mRows.map(r=>r.expenses),'#fb7185'),
+    sparkCol(mRows.map(r=>r.savings),'#8b5cf6')
+  ],12));
+  E();
+  d.push(pad(['MONTHLY HEALTH','','','','','','','','','BALANCE TREND','INCOME vs EXPENSES','NET CASH FLOW'],12));
+  d.push(pad(['','','','','','','','','',
+    sparkLine(mRows.map(r=>r.balance),'#3b82f6'),
+    sparkLine(mRows.map(r=>r.totalIn-r.expenses),'#34d399'),
+    sparkWL(mRows.map(r=>r.balance>=0?1:-1))
+  ],12));
+  E();
+
+  // ═══════════════════════════════════════════════════════════
+  // MONTHLY CASH FLOW TABLE
+  // ═══════════════════════════════════════════════════════════
+  d.push(pad(['MONTHLY CASH FLOW'],12));
+  d.push(pad(['Month','Income','Expenses','Cards','Bills','Direct','Saved','Balance','Sav Rate','MoM Change','vs Average','Trend'],12));
+  mRows.forEach((r,i) => {
+    const prevR=i>0?mRows[i-1]:null;
+    d.push(pad([r.label, r.totalIn, r.expenses, r.debt, r.bills, r.direct, r.savings, r.balance, r.sRate+'%',
+      prevR?momChange(r.balance,prevR.balance):'--',
+      momChange(r.totalIn,avgIn),
+      i===0?sparkLine(mRows.map(x=>x.balance),'#3b82f6'):''
+    ],12));
+  });
+  d.push(pad(['TOTALS', allIn, allExp, r2(mRows.reduce((s,r)=>s+r.debt,0)), r2(mRows.reduce((s,r)=>s+r.bills,0)), r2(mRows.reduce((s,r)=>s+r.direct,0)), allSav, lastBal, pct(allSav,allIn)+'%', '', '', ''],12));
+  d.push(pad(['AVERAGES', avgIn, avgExp, r2(mRows.reduce((s,r)=>s+r.debt,0)/Math.max(mRows.length,1)), r2(mRows.reduce((s,r)=>s+r.bills,0)/Math.max(mRows.length,1)), r2(mRows.reduce((s,r)=>s+r.direct,0)/Math.max(mRows.length,1)), avgSav, r2(mRows.reduce((s,r)=>s+r.balance,0)/Math.max(mRows.length,1)), '', '', '', ''],12));
+  E();
+
+  // ═══════════════════════════════════════════════════════════
+  // INCOME BREAKDOWN
+  // ═══════════════════════════════════════════════════════════
+  d.push(pad(['INCOME BREAKDOWN'],12));
+  d.push(pad(['Month','Starting Bal','Paycheck 1','Paycheck 2','Total Pay','Commission','Grand Total','% of Avg','vs Last Month','Commission Trend','Pay Trend',''],12));
+  let cumComm=0;
+  mRows.forEach((r,i) => {
+    cumComm+=r.commission;
+    const prevR=i>0?mRows[i-1]:null;
+    d.push(pad([r.label, r.starting, r2(r.paychecks/2), r2(r.paychecks/2), r.paychecks, r.commission, r.totalIn,
+      pct(r.totalIn,avgIn)+'%',
+      prevR?momPct(r.totalIn,prevR.totalIn):'--',
+      i===0?sparkCol(mRows.map(x=>x.commission),'#f59e0b'):'',
+      i===0?sparkCol(mRows.map(x=>x.paychecks),'#34d399'):'',
+      ''
+    ],12));
+  });
+  d.push(pad(['TOTALS', r2(mRows.reduce((s,r)=>s+r.starting,0)), '', '', r2(mRows.reduce((s,r)=>s+r.paychecks,0)), r2(cumComm), allIn, '', '', '', '', ''],12));
+  E();
+
+  // ═══════════════════════════════════════════════════════════
+  // BUDGET vs ACTUAL (THIS MONTH)
+  // ═══════════════════════════════════════════════════════════
+  d.push(pad(['BUDGET vs ACTUAL  |  '+(latest?.label||'This Month')],12));
+  d.push(pad(['Category','Budgeted','Actual','Variance','% Used','Status','Budget Usage Bar','','','','',''],12));
+  const budgetItems=[
+    {l:'Credit Cards (Amex)',  bud:r2(budSubs*0.65), act:r2(latest?.amex||0)},
+    {l:'Credit Cards (BOA)',   bud:r2(budSubs*0.35), act:r2(latest?.boa||0)},
+    {l:'Fixed Bills',          bud:budBills,          act:r2(latest?.bills||0)},
+    {l:'Goal Savings',         bud:budSavings,        act:r2(latest?.savings||0)},
+    {l:'Direct / One-Time',    bud:0,                 act:r2(latest?.direct||0)},
+  ];
+  budgetItems.forEach(b => {
+    const variance=r2(b.act-b.bud);
+    const used=b.bud>0?Math.round((b.act/b.bud)*100):0;
+    const budColor=b.bud<=0?'#9ca3af':used>100?'#ef4444':used>85?'#f59e0b':'#22c55e';
+    d.push(pad([b.l, b.bud>0?b.bud:'Variable', b.act, b.bud>0?variance:'--', b.bud>0?used+'%':'--', status(b.act,b.bud),
+      b.bud>0?sparkBar(Math.min(b.act/b.bud,1.5), budColor, '#f3f4f6'):'',
+      '','','','',''
+    ],12));
+  });
+  const totalBudAct=r2(budgetItems.reduce((s,b)=>s+b.act,0));
+  d.push(pad(['TOTAL', budTotal, totalBudAct, r2(totalBudAct-budTotal), budTotal>0?pct(totalBudAct,budTotal)+'%':'', status(totalBudAct,budTotal), sparkBar(Math.min(totalBudAct/Math.max(budTotal,1),1.5), totalBudAct>budTotal?'#ef4444':'#22c55e','#f3f4f6'), '','','','',''],12));
+  E();
+
+  // ═══════════════════════════════════════════════════════════
+  // SPENDING CATEGORIES (PIE-STYLE BREAKDOWN)
+  // ═══════════════════════════════════════════════════════════
+  d.push(pad(['SPENDING BREAKDOWN  |  '+(latest?.label||'This Month')],12));
+  d.push(pad(['Category','Amount','% of Total','% of Income','Size Bar','','','Category Comparison','','','',''],12));
+  const spendCats=[
+    {l:'Amex Card',    amt:r2(latest?.amex||0),   color:'#3b82f6'},
+    {l:'BOA Card',     amt:r2(latest?.boa||0),     color:'#f59e0b'},
+    {l:'Fixed Bills',  amt:r2(latest?.bills||0),   color:'#22c55e'},
+    {l:'Direct Spend', amt:r2(latest?.direct||0),  color:'#f97316'},
+    {l:'Goal Savings', amt:r2(latest?.savings||0), color:'#8b5cf6'},
+  ];
+  const spendTotal=spendCats.reduce((s,c)=>s+c.amt,0)||1;
+  spendCats.forEach((c,i) => {
+    d.push(pad([c.l, c.amt, pct(c.amt,spendTotal)+'%', pct(c.amt,latest?.totalIn||1)+'%',
+      sparkBar(c.amt/spendTotal, c.color, '#f3f4f6'), '',  '',
+      i===0?sparkCol(spendCats.map(x=>x.amt),'#6366f1'):'',
+      '','','',''
+    ],12));
+  });
+  d.push(pad(['TOTAL OUTFLOWS', r2(spendTotal), '100%', pct(spendTotal,latest?.totalIn||1)+'%', '', '', '', '', '','','',''],12));
+  E();
+
+  // ═══════════════════════════════════════════════════════════
+  // SAVINGS GOALS
+  // ═══════════════════════════════════════════════════════════
+  d.push(pad(['SAVINGS GOALS'],12));
+  d.push(pad(['Goal','Type','Target','Saved','Remaining','Progress','Monthly Pace','Months Left','ETA','Progress Bar','Status',''],12));
+  goalsConfig.forEach(g => {
+    const saved=r2(cur(goalSaved[g.id])), target=r2(cur(goalTargets[g.id]||g.target));
+    const rem=r2(Math.max(0,target-saved)), prog=target>0?saved/target:0;
+    const pace=g.monthly||0;
+    const contribs=mRows.map(r=>cur((months[r.key].goalContributions||{})[g.id])).filter(v=>v>0);
+    const avgPace=contribs.length?r2(contribs.reduce((s,v)=>s+v,0)/contribs.length):pace;
+    const mLeft=avgPace>0?Math.ceil(rem/avgPace):null;
+    const proj=mLeft?(()=>{const dt=new Date();dt.setMonth(dt.getMonth()+mLeft);return dt.toLocaleDateString('en-US',{month:'short',year:'numeric'});})():'--';
+    const goalStatus=prog>=1?'COMPLETE':prog>=0.75?'ALMOST':prog>=0.5?'HALFWAY':'BUILDING';
+    d.push(pad([clean(g.label), g.type||'', target, saved, rem, Math.round(prog*100)+'%', r2(avgPace), mLeft||'--', proj,
+      sparkBar(prog, g.color, '#f3f4f6'), goalStatus, ''
+    ],12));
+  });
+  const totalTarget=r2(Object.values(goalTargets).reduce((s,v)=>s+cur(v),0));
+  const totalProg=totalTarget>0?allGT/totalTarget:0;
+  d.push(pad(['ALL GOALS', '', totalTarget, allGT, r2(Math.max(0,totalTarget-allGT)), Math.round(totalProg*100)+'%', r2(goalsConfig.reduce((s,g)=>s+g.monthly,0)), '', '',
+    sparkBar(totalProg,'#3b82f6','#f3f4f6'), totalProg>=1?'COMPLETE':'IN PROGRESS', ''
+  ],12));
+  E();
+
+  // ═══════════════════════════════════════════════════════════
+  // CREDIT CARD TRACKING
+  // ═══════════════════════════════════════════════════════════
+  d.push(pad(['CREDIT CARD TRACKING'],12));
+  d.push(pad(['Card','This Month','Last Month','Change','Change %','Direction','Due Date','YTD Paid','Avg Monthly','Monthly Trend','YTD Bar',''],12));
+  const cards=[
+    {c:'American Express',mtd:r2(latest?.amex||0),prev:r2(prev?.amex||0),due:'4th',ytd:r2(mRows.reduce((s,r)=>s+r.amex,0)),trend:mRows.map(r=>r.amex)},
+    {c:'Bank of America', mtd:r2(latest?.boa||0), prev:r2(prev?.boa||0), due:'17th',ytd:r2(mRows.reduce((s,r)=>s+r.boa,0)), trend:mRows.map(r=>r.boa)}
+  ];
+  cards.forEach(cd=>{
+    const diff=r2(cd.mtd-cd.prev);
+    const dir=diff<0?'DECREASING':diff>0?'INCREASING':'STABLE';
+    const avg=mRows.length?r2(cd.ytd/mRows.length):0;
+    d.push(pad([cd.c, cd.mtd, cd.prev, diff, momPct(cd.mtd,cd.prev), dir, cd.due+' of month', cd.ytd, avg,
+      sparkLine(cd.trend, diff<=0?'#22c55e':'#ef4444'),
+      sparkBar(cd.ytd/Math.max(allExp,1), '#6366f1','#f3f4f6'), ''
+    ],12));
+  });
+  const totalDebt=r2((latest?.debt||0)), prevDebt=r2((prev?.debt||0)), debtDiff=r2(totalDebt-prevDebt);
+  d.push(pad(['TOTAL CARDS', totalDebt, prevDebt, debtDiff, momPct(totalDebt,prevDebt), debtDiff<=0?'DECREASING':'INCREASING', '', r2(mRows.reduce((s,r)=>s+r.debt,0)), '', sparkLine(mRows.map(r=>r.debt),debtDiff<=0?'#22c55e':'#ef4444'), '', ''],12));
+  E();
+
+  // ═══════════════════════════════════════════════════════════
+  // SUBSCRIPTIONS
+  // ═══════════════════════════════════════════════════════════
+  d.push(pad(['RECURRING SUBSCRIPTIONS'],12));
+  d.push(pad(['Service','Card','Monthly','Annual','% of Sub Budget','Cost Bar','','','','','',''],12));
+  const allSubs=[...amexSubs.map(s=>({...s,card:'Amex'})),...boaSubs.map(s=>({...s,card:'BOA'}))];
+  const subColors=['#3b82f6','#8b5cf6','#ec4899','#f59e0b','#06b6d4','#10b981','#f97316','#6366f1','#14b8a6','#ef4444','#84cc16'];
+  allSubs.forEach((s,i) => {
+    d.push(pad([s.label, s.card, r2(s.amount), r2(s.amount*12), pct(s.amount,budSubs)+'%',
+      sparkBar(s.amount/Math.max(budSubs,1), subColors[i%subColors.length],'#f3f4f6'),
+      '','','','','',''
+    ],12));
+  });
+  d.push(pad(['TOTAL SUBSCRIPTIONS', '', r2(budSubs), r2(budSubs*12), '100%', sparkBar(1,'#6366f1','#f3f4f6'), '','','','','',''],12));
+  E();
+
+  // ═══════════════════════════════════════════════════════════
+  // FINANCIAL HEALTH SCORECARD
+  // ═══════════════════════════════════════════════════════════
+  const savRate=pct(allSav,allIn);
+  const expRatio=pct(allExp,allIn);
+  const healthScore=Math.min(100, Math.round((savRate>=20?30:savRate>=10?20:savRate*1.5) + (expRatio<=60?30:expRatio<=75?20:10) + (lastBal>0?20:0) + (totalProg>=0.5?20:totalProg*40)));
+  const healthColor=healthScore>=75?'#22c55e':healthScore>=50?'#f59e0b':'#ef4444';
+  const healthLabel=healthScore>=75?'STRONG':healthScore>=50?'MODERATE':'NEEDS ATTENTION';
+  const netCF=r2((latest?.totalIn||0)-(latest?.expenses||0)-(latest?.savings||0));
+  const safeToSpend=r2(Math.max(0,lastBal-budBills-budSubs));
+
+  d.push(pad(['FINANCIAL HEALTH SCORECARD'],12));
+  d.push(pad(['Metric','Value','Rating','Visual','','Metric','Value','Rating','Visual','','',''],12));
+  d.push(pad(['Health Score',healthScore+'/100',healthLabel,sparkBar(healthScore/100,healthColor,'#f3f4f6'),'',
+    'Savings Rate',savRate+'%',savRate>=20?'GREAT':savRate>=10?'GOOD':'LOW',sparkBar(Math.min(savRate/25,1),savRate>=20?'#22c55e':savRate>=10?'#f59e0b':'#ef4444','#f3f4f6'),'','',''
+  ],12));
+  d.push(pad(['Net Cash Flow',netCF,netCF>=0?'POSITIVE':'NEGATIVE',sparkBar(Math.max(0,netCF)/Math.max(latest?.totalIn||1,1),'#3b82f6','#f3f4f6'),'',
+    'Expense Ratio',expRatio+'%',expRatio<=60?'LEAN':expRatio<=75?'OK':'HIGH',sparkBar(Math.min(expRatio/100,1),expRatio<=60?'#22c55e':expRatio<=75?'#f59e0b':'#ef4444','#f3f4f6'),'','',''
+  ],12));
+  d.push(pad(['Safe to Spend',safeToSpend,safeToSpend>200?'GOOD':safeToSpend>0?'TIGHT':'CAUTION','','',
+    'Goal Progress',Math.round(totalProg*100)+'%',totalProg>=0.5?'ON TRACK':'BUILDING',sparkBar(totalProg,'#8b5cf6','#f3f4f6'),'','',''
+  ],12));
+  E();
+
+  // ═══════════════════════════════════════════════════════════
+  // CHART DATA (for creating full-size Google Sheets charts)
+  // ═══════════════════════════════════════════════════════════
+  d.push(pad(['CHART DATA  |  Select a column range below and use Insert > Chart to create full-size graphs'],12));
+  E();
+  d.push(pad(['Monthly Trends (select A:G below for a chart)'],12));
+  d.push(pad(['Month','Income','Expenses','Saved','Balance','Net Cash Flow','Cumulative Saved','','','','',''],12));
+  let cumSaved=0;
+  mRows.forEach(r => {
+    cumSaved+=r.savings;
+    d.push(pad([r.label, r.totalIn, r.expenses, r.savings, r.balance, r2(r.totalIn-r.expenses-r.savings), r2(cumSaved),'','','','',''],12));
+  });
+  E();
+  d.push(pad(['Goal Progress (select A:C below for a chart)'],12));
+  d.push(pad(['Goal','Saved','Remaining','','','','','','','','',''],12));
+  goalsConfig.forEach(g => {
+    const saved=r2(cur(goalSaved[g.id])), target=r2(cur(goalTargets[g.id]||g.target));
+    d.push(pad([clean(g.label), saved, r2(Math.max(0,target-saved)),'','','','','','','','',''],12));
+  });
+  E();
+  d.push(pad(['Spending Categories (select A:B below for a pie chart)'],12));
+  d.push(pad(['Category','Amount','','','','','','','','','',''],12));
+  spendCats.forEach(c => d.push(pad([c.l, c.amt,'','','','','','','','','',''],12)));
+  E();
+
+  d.push(pad(['HOW TO USE: Select number columns > Format > Number > Currency. Select data ranges > Insert > Chart for full-size graphs.'],12));
+
+  return d;
+}
+
 // ── EXPORT TO EXCEL / GOOGLE SHEETS ──────────────────────────
 async function exportToSheets({months, goalSaved, goalTargets, goalsConfig, amexSubs, boaSubs, sortedKeys, billTemplates, mode='download', appsScriptUrl='', appsScriptSecret=''}) {
+  if (mode === 'clipboard') {
+    const d = buildDashboard({months,goalSaved,goalTargets,goalsConfig,amexSubs,boaSubs,sortedKeys,billTemplates});
+    const tsv = d.map(row => row.join('\t')).join('\n');
+    await navigator.clipboard.writeText(tsv);
+    return;
+  }
+
+  if (mode === 'csv') {
+    const d = buildDashboard({months,goalSaved,goalTargets,goalsConfig,amexSubs,boaSubs,sortedKeys,billTemplates});
+    const csv = d.map(row => row.map(cell => {
+      const s = String(cell);
+      return '"'+s.replace(/"/g,'""')+'"';
+    }).join(',')).join('\n');
+    const blob = new Blob(['﻿'+csv], {type:'text/csv;charset=utf-8;'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url; a.download = `MyBudget_${new Date().getFullYear()}_Dashboard.csv`; a.click(); URL.revokeObjectURL(url);
+    return;
+  }
+
   const ExcelJS = (await import('exceljs')).default;
   const wb = new ExcelJS.Workbook();
   wb.creator='My Budget App'; wb.created=new Date();
@@ -713,7 +1008,8 @@ async function exportToSheets({months, goalSaved, goalTargets, goalsConfig, amex
     const starting  =cur(m.startingBalance);
     const paychecks =m.paychecks.reduce((s,p)=>s+cur(p.amount),0);
     const commission=cur(m.commission?.amount);
-    const totalIn   =starting+paychecks+commission;
+    const sideInc   =(m.sideIncome||[]).reduce((s,t)=>s+cur(t.amount),0);
+    const totalIn   =starting+paychecks+commission+sideInc;
     const amex      =m.amex?.paid?cur(m.amex?.statementBalance):0;
     const boa       =m.boa?.paid?cur(m.boa?.statementBalance):0;
     const bills     =m.bills.filter(b=>b.paid).reduce((s,b)=>s+b.amount,0);
@@ -1102,6 +1398,7 @@ export default function App() {
   const [goalsConfig, setGoalsConfig]   = useState(DEF_GOALS);
   const [billTemplates, setBillTemplates] = useState(DEF_BILLS);
   const [paycheckLabels, setPaycheckLabels] = useState(DEF_PCHECKS);
+  const [cardLimits, setCardLimits]     = useState({amex:1000, boa:1000});
   const [appsScriptUrl, setAppsScriptUrl]     = useState("");
   const [appsScriptSecret, setAppsScriptSecret] = useState("");
   const [syncStatus, setSyncStatus]           = useState("idle");
@@ -1125,6 +1422,8 @@ export default function App() {
           window.storage.get("boaSubs_v1"), window.storage.get("goalsConfig_v1"),
           window.storage.get("billTemplates_v1"), window.storage.get("paycheckLabels_v1"),
         ]);
+        const rCL = await window.storage.get("cardLimits_v1");
+        if (rCL?.value) { try { setCardLimits(JSON.parse(rCL.value)); } catch(_){} }
         if (r1.status==="fulfilled"&&r1.value) setMonths(JSON.parse(r1.value.value));
         if (r2.status==="fulfilled"&&r2.value) setGoalSaved(JSON.parse(r2.value.value));
         if (r3.status==="fulfilled"&&r3.value) setGoalTargets(JSON.parse(r3.value.value));
@@ -1158,11 +1457,12 @@ export default function App() {
         await window.storage.set("goalsConfig_v1", JSON.stringify(goalsConfig));
         await window.storage.set("billTemplates_v1", JSON.stringify(billTemplates));
         await window.storage.set("paycheckLabels_v1", JSON.stringify(paycheckLabels));
+        await window.storage.set("cardLimits_v1", JSON.stringify(cardLimits));
         await window.storage.set("appsScriptUrl",    appsScriptUrl);
         await window.storage.set("appsScriptSecret", appsScriptSecret);
       } catch(_){}
     })();
-  },[months,goalSaved,goalTargets,currentKey,themeMode,amexSubs,boaSubs,goalsConfig,billTemplates,paycheckLabels,appsScriptUrl,appsScriptSecret,loaded]);
+  },[months,goalSaved,goalTargets,currentKey,themeMode,amexSubs,boaSubs,goalsConfig,billTemplates,paycheckLabels,cardLimits,appsScriptUrl,appsScriptSecret,loaded]);
 
   const curMonth = months[currentKey] || newMonth(currentKey);
   const setCurMonth = useCallback((fn)=>{
@@ -1174,12 +1474,13 @@ export default function App() {
 
   const startNewMonth = () => {
     const cur = months[currentKey]||newMonth(currentKey);
-    const totalIn   = cur.paychecks.reduce((s,p)=>s+(parseFloat(p.amount)||0),0)+(parseFloat(cur.commission?.amount)||0)+(parseFloat(cur.startingBalance)||0);
+    const sideIncomeTotal = (cur.sideIncome||[]).reduce((s,t)=>s+(parseFloat(t.amount)||0),0);
+    const totalIn   = cur.paychecks.reduce((s,p)=>s+(parseFloat(p.amount)||0),0)+(parseFloat(cur.commission?.amount)||0)+(parseFloat(cur.startingBalance)||0)+sideIncomeTotal;
     const amexBal   = cur.amex?.paid?(parseFloat(cur.amex?.statementBalance)||0):0;
     const boaBal    = cur.boa?.paid?(parseFloat(cur.boa?.statementBalance)||0):0;
     const fixedOut  = cur.bills.filter(b=>b.paid).reduce((s,b)=>s+b.amount,0);
     const directOut = (cur.directTransactions||[]).reduce((s,t)=>s+(parseFloat(t.amount)||0),0);
-    const goalOut   = Object.entries(cur.goalContributions||{}).filter(([id])=>id!=="3").reduce((s,[,v])=>s+v,0);
+    const goalOut   = Object.entries(cur.goalContributions||{}).filter(([id])=>!goalsConfig.find(g=>String(g.id)===id)?.preTax).reduce((s,[,v])=>s+v,0);
     const leftover  = Math.max(0, totalIn-amexBal-boaBal-fixedOut-directOut-goalOut);
     setMonths(prev=>({...prev,[currentKey]:{...cur,locked:true}}));
     const [y,m] = currentKey.split("-").map(Number);
@@ -1251,11 +1552,11 @@ export default function App() {
   };
 
   const screens = {
-    home:      <HomeScreen month={curMonth} goalSaved={goalSaved} goalTargets={goalTargets} goalsConfig={goalsConfig} onNewMonth={startNewMonth} currentKey={currentKey} months={months} sortedKeys={sortedKeys} isCurrentMonth={isCurrentMonth} onExport={async(mode)=>{await exportToSheets({months,goalSaved,goalTargets,goalsConfig,amexSubs,boaSubs,sortedKeys,billTemplates,mode,appsScriptUrl,appsScriptSecret});}} appsScriptUrl={appsScriptUrl} />,
-    paychecks: <PaychecksScreen month={curMonth} setMonth={setCurMonth} />,
-    cards:     <CardsScreen month={curMonth} setMonth={setCurMonth} amexSubs={amexSubs} boaSubs={boaSubs} />,
+    home:      <HomeScreen month={curMonth} setMonth={setCurMonth} goalSaved={goalSaved} goalTargets={goalTargets} goalsConfig={goalsConfig} onNewMonth={startNewMonth} currentKey={currentKey} months={months} sortedKeys={sortedKeys} isCurrentMonth={isCurrentMonth} onExport={async(mode)=>{await exportToSheets({months,goalSaved,goalTargets,goalsConfig,amexSubs,boaSubs,sortedKeys,billTemplates,mode,appsScriptUrl,appsScriptSecret});}} appsScriptUrl={appsScriptUrl} />,
+    paychecks: <PaychecksScreen month={curMonth} setMonth={setCurMonth} goalsConfig={goalsConfig} billTemplates={billTemplates} />,
+    cards:     <CardsScreen month={curMonth} setMonth={setCurMonth} amexSubs={amexSubs} boaSubs={boaSubs} cardLimits={cardLimits} />,
     goals:     <GoalsScreen goalSaved={goalSaved} setGoalSaved={setGoalSaved} goalTargets={goalTargets} setGoalTargets={setGoalTargets} onContribute={addContrib} currentMonth={curMonth} month={curMonth} setMonth={setCurMonth} goalsConfig={goalsConfig} />,
-    settings:  <SettingsScreen themeMode={themeMode} setThemeMode={setThemeMode} amexSubs={amexSubs} setAmexSubs={setAmexSubs} boaSubs={boaSubs} setBoaSubs={setBoaSubs} goalsConfig={goalsConfig} setGoalsConfig={setGoalsConfig} goalSaved={goalSaved} setGoalSaved={setGoalSaved} goalTargets={goalTargets} setGoalTargets={setGoalTargets} billTemplates={billTemplates} setBillTemplates={handleSaveBillTemplates} paycheckLabels={paycheckLabels} setPaycheckLabels={setPaycheckLabels} setMonths={setMonths} appsScriptUrl={appsScriptUrl} setAppsScriptUrl={setAppsScriptUrl} appsScriptSecret={appsScriptSecret} setAppsScriptSecret={setAppsScriptSecret} onDisconnect={()=>{setAppsScriptUrl("");setAppsScriptSecret("");}} syncStatus={syncStatus} lastSync={lastSync} syncError={syncError}/>,
+    settings:  <SettingsScreen themeMode={themeMode} setThemeMode={setThemeMode} amexSubs={amexSubs} setAmexSubs={setAmexSubs} boaSubs={boaSubs} setBoaSubs={setBoaSubs} goalsConfig={goalsConfig} setGoalsConfig={setGoalsConfig} goalSaved={goalSaved} setGoalSaved={setGoalSaved} goalTargets={goalTargets} setGoalTargets={setGoalTargets} billTemplates={billTemplates} setBillTemplates={handleSaveBillTemplates} setBillTemplatesRaw={setBillTemplates} paycheckLabels={paycheckLabels} setPaycheckLabels={setPaycheckLabels} cardLimits={cardLimits} setCardLimits={setCardLimits} months={months} setMonths={setMonths} appsScriptUrl={appsScriptUrl} setAppsScriptUrl={setAppsScriptUrl} appsScriptSecret={appsScriptSecret} setAppsScriptSecret={setAppsScriptSecret} onDisconnect={()=>{setAppsScriptUrl("");setAppsScriptSecret("");}} syncStatus={syncStatus} lastSync={lastSync} syncError={syncError}/>,
   };
 
   return (
@@ -1307,8 +1608,11 @@ export default function App() {
 }
 
 // ── HOME SCREEN ───────────────────────────────────────────────
-function HomeScreen({month, goalSaved, goalTargets, goalsConfig, onNewMonth, currentKey, months, sortedKeys, isCurrentMonth, onExport, appsScriptUrl}) {
-  const [exporting, setExporting] = useState(null); // null | 'xlsx' | 'sheets'
+function HomeScreen({month, setMonth, goalSaved, goalTargets, goalsConfig, onNewMonth, currentKey, months, sortedKeys, isCurrentMonth, onExport, appsScriptUrl}) {
+  const [exporting, setExporting] = useState(null);
+  const [copied, setCopied] = useState(false);
+  const [confirmNew, setConfirmNew] = useState(false);
+  const [notesOpen, setNotesOpen] = useState(false);
   const handleExport = async (mode) => {
     setExporting(mode);
     try { await onExport(mode); } catch(e){ alert(e.message); } finally { setExporting(null); }
@@ -1317,12 +1621,13 @@ function HomeScreen({month, goalSaved, goalTargets, goalsConfig, onNewMonth, cur
   const [historyOpen, setHistoryOpen] = useState(false);
   const [expanded, setExpanded]       = useState(null);
 
-  const totalIn   = month.paychecks.reduce((s,p)=>s+(parseFloat(p.amount)||0),0)+(parseFloat(month.commission?.amount)||0)+(parseFloat(month.startingBalance)||0);
+  const sideIncomeTotal = (month.sideIncome||[]).reduce((s,t)=>s+(parseFloat(t.amount)||0),0);
+  const totalIn   = month.paychecks.reduce((s,p)=>s+(parseFloat(p.amount)||0),0)+(parseFloat(month.commission?.amount)||0)+(parseFloat(month.startingBalance)||0)+sideIncomeTotal;
   const amexBal   = month.amex?.paid?(parseFloat(month.amex?.statementBalance)||0):0;
   const boaBal    = month.boa?.paid?(parseFloat(month.boa?.statementBalance)||0):0;
   const fixedOut  = month.bills.filter(b=>b.paid).reduce((s,b)=>s+b.amount,0);
   const directOut = (month.directTransactions||[]).reduce((s,t)=>s+(parseFloat(t.amount)||0),0);
-  const goalOut   = Object.entries(month.goalContributions||{}).filter(([id])=>id!=="3").reduce((s,[,v])=>s+v,0);
+  const goalOut   = Object.entries(month.goalContributions||{}).filter(([id])=>!goalsConfig.find(g=>String(g.id)===id)?.preTax).reduce((s,[,v])=>s+v,0);
   const spent     = amexBal+boaBal+fixedOut+directOut;
   const leftover  = totalIn - spent - goalOut;
   const allPaid   = month.bills.every(b=>b.paid)&&month.amex?.paid&&month.boa?.paid;
@@ -1331,7 +1636,7 @@ function HomeScreen({month, goalSaved, goalTargets, goalsConfig, onNewMonth, cur
     + (!month.amex?.paid?(parseFloat(month.amex?.statementBalance)||0):0)
     + (!month.boa?.paid?(parseFloat(month.boa?.statementBalance)||0):0);
 
-  const totalEarned  = Object.values(months).reduce((s,m)=>s+m.paychecks.reduce((ps,p)=>ps+(parseFloat(p.amount)||0),0)+(parseFloat(m.commission?.amount)||0),0);
+  const totalEarned  = Object.values(months).reduce((s,m)=>s+m.paychecks.reduce((ps,p)=>ps+(parseFloat(p.amount)||0),0)+(parseFloat(m.commission?.amount)||0)+(m.sideIncome||[]).reduce((ss,t)=>ss+(parseFloat(t.amount)||0),0),0);
   const totalSpent   = Object.values(months).reduce((s,m)=>s+(m.amex?.paid?(parseFloat(m.amex?.statementBalance)||0):0)+(m.boa?.paid?(parseFloat(m.boa?.statementBalance)||0):0)+m.bills.filter(b=>b.paid).reduce((bs,b)=>bs+b.amount,0)+(m.directTransactions||[]).reduce((ts,t)=>ts+(parseFloat(t.amount)||0),0),0);
   const totalSaved   = Object.values(goalSaved).reduce((s,v)=>s+v,0);
   const netWorth     = totalGs + Math.max(0, leftover);
@@ -1347,6 +1652,19 @@ function HomeScreen({month, goalSaved, goalTargets, goalsConfig, onNewMonth, cur
 
   return (
     <div>
+      {confirmNew && (
+        <div onClick={()=>setConfirmNew(false)} style={{position:"fixed", inset:0, background:"rgba(0,0,0,0.6)", display:"flex", alignItems:"center", justifyContent:"center", zIndex:1000, padding:24}}>
+          <div onClick={e=>e.stopPropagation()} style={{background:T.card, border:`1px solid ${T.border}`, borderRadius:18, padding:"22px 20px", maxWidth:320, width:"100%", boxShadow:T.shadow}}>
+            <div style={{color:T.text, fontSize:17, fontWeight:800, marginBottom:6}}>Start New Month?</div>
+            <div style={{color:T.sub, fontSize:13, lineHeight:1.5, marginBottom:18}}>This saves {monthLabel(currentKey)} and carries your remaining balance forward. You can still view it in history.</div>
+            <div onClick={()=>{setConfirmNew(false); onNewMonth();}} style={{background:"linear-gradient(135deg,#3b82f6 0%,#0ea5e9 100%)", borderRadius:12, padding:"13px", textAlign:"center", cursor:"pointer", marginBottom:8}}>
+              <span style={{color:"#fff", fontSize:14, fontWeight:700}}>Yes, start new month</span>
+            </div>
+            <div onClick={()=>setConfirmNew(false)} style={{background:T.inBg, borderRadius:12, padding:"13px", textAlign:"center", cursor:"pointer", color:T.sub, fontSize:14, fontWeight:600}}>Cancel</div>
+          </div>
+        </div>
+      )}
+
       {/* ── Balance Ring Card ── */}
       <Card style={{background: T.mode==="dark"
         ? "linear-gradient(145deg,#1a1f3c,#0f1d40,#0d1530)"
@@ -1382,6 +1700,29 @@ function HomeScreen({month, goalSaved, goalTargets, goalsConfig, onNewMonth, cur
           )}
         </div>
       </Card>
+
+      {/* ── Month Notes ── */}
+      {(month.notes || notesOpen) ? (
+        <Card>
+          <div style={{padding:"12px 14px"}}>
+            <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:8}}>
+              <span style={{fontFamily:"var(--mono)", color:T.muted, fontSize:9, fontWeight:600, letterSpacing:"0.12em", textTransform:"uppercase"}}>📝 Notes — {monthLabel(currentKey)}</span>
+              {notesOpen && <div onClick={()=>setNotesOpen(false)} style={{color:T.muted, fontSize:12, cursor:"pointer"}}>Done</div>}
+            </div>
+            {notesOpen ? (
+              <textarea autoFocus value={month.notes||""} onChange={e=>setMonth(m=>({...m,notes:e.target.value}))}
+                placeholder="Add a note for this month…"
+                style={{width:"100%", minHeight:70, resize:"vertical", background:T.inBg, border:`1.5px solid ${T.inBorder}`, borderRadius:10, color:T.text, fontSize:14, padding:"9px 11px", outline:"none", fontFamily:"inherit", boxSizing:"border-box"}}/>
+            ) : (
+              <div onClick={()=>setNotesOpen(true)} style={{color:T.sub, fontSize:13, lineHeight:1.5, whiteSpace:"pre-wrap", cursor:"pointer"}}>{month.notes}</div>
+            )}
+          </div>
+        </Card>
+      ) : (
+        <div onClick={()=>setNotesOpen(true)} style={{display:"flex", alignItems:"center", justifyContent:"center", gap:6, background:T.card, border:`1px dashed ${T.border}`, borderRadius:14, padding:"10px", cursor:"pointer", marginBottom:12, color:T.muted, fontSize:12, fontWeight:600}}>
+          📝 Add Note
+        </div>
+      )}
 
       {/* ── Spending Breakdown ── */}
       {(spent+goalOut) > 0 && (
@@ -1453,7 +1794,7 @@ function HomeScreen({month, goalSaved, goalTargets, goalsConfig, onNewMonth, cur
           <div style={{color:T.muted, fontSize:11, marginTop:4}}>Tap ➕ Start New Month on your current month to advance.</div>
         </div>
       ) : !month.locked ? (
-        <div onClick={onNewMonth} style={{background:"linear-gradient(135deg,#3b82f6 0%,#0ea5e9 100%)", borderRadius:16, padding:"16px", textAlign:"center", cursor:"pointer", marginBottom:12, boxShadow:"0 4px 16px rgba(59,130,246,.35)"}}>
+        <div onClick={()=>setConfirmNew(true)} style={{background:"linear-gradient(135deg,#3b82f6 0%,#0ea5e9 100%)", borderRadius:16, padding:"16px", textAlign:"center", cursor:"pointer", marginBottom:12, boxShadow:"0 4px 16px rgba(59,130,246,.35)"}}>
           <div style={{color:"#fff", fontSize:15, fontWeight:700}}>➕ Start New Month</div>
           <div style={{color:"rgba(255,255,255,0.6)", fontSize:11, marginTop:3}}>Saves this month & carries over balance</div>
         </div>
@@ -1514,39 +1855,126 @@ function HomeScreen({month, goalSaved, goalTargets, goalsConfig, onNewMonth, cur
         </>
       )}
 
+      {/* ── Year-over-Year Comparison ── */}
+      {(() => {
+        const [cy,cm] = currentKey.split("-").map(Number);
+        const lastYearKey = `${cy-1}-${String(cm).padStart(2,"0")}`;
+        const ly = months[lastYearKey];
+        const mInc = m => m.paychecks.reduce((s,p)=>s+(parseFloat(p.amount)||0),0)+(parseFloat(m.commission?.amount)||0)+(parseFloat(m.startingBalance)||0)+(m.sideIncome||[]).reduce((s,t)=>s+(parseFloat(t.amount)||0),0);
+        const mExp = m => (m.amex?.paid?(parseFloat(m.amex?.statementBalance)||0):0)+(m.boa?.paid?(parseFloat(m.boa?.statementBalance)||0):0)+m.bills.filter(b=>b.paid).reduce((s,b)=>s+b.amount,0)+(m.directTransactions||[]).reduce((s,t)=>s+(parseFloat(t.amount)||0),0);
+        const mSav = m => Object.entries(m.goalContributions||{}).filter(([id])=>!goalsConfig.find(g=>String(g.id)===id)?.preTax).reduce((s,[,v])=>s+v,0);
+        const hasLY = ly && mInc(ly) > 0;
+        return (
+          <>
+            <SLabel>Year-over-Year</SLabel>
+            <Card>
+              {hasLY ? (
+                <div style={{padding:"14px 16px"}}>
+                  <div style={{display:"flex", justifyContent:"space-between", marginBottom:12}}>
+                    <span style={{fontFamily:"var(--mono)", color:T.muted, fontSize:9, fontWeight:600, letterSpacing:"0.12em", textTransform:"uppercase"}}>{monthLabel(lastYearKey)}</span>
+                    <span style={{fontFamily:"var(--mono)", color:T.accent, fontSize:9, fontWeight:600, letterSpacing:"0.12em", textTransform:"uppercase"}}>{monthLabel(currentKey)}</span>
+                  </div>
+                  {[["💰 Income", mInc(ly), totalIn, T.green],["💳 Expenses", mExp(ly), spent, T.red],["🎯 Saved", mSav(ly), goalOut, T.purple]].map(([label,past,now,col])=>{
+                    const diff = now-past;
+                    return (
+                      <div key={label} style={{marginBottom:10}}>
+                        <div style={{display:"flex", justifyContent:"space-between", alignItems:"center"}}>
+                          <span style={{color:T.sub, fontSize:13, fontWeight:500}}>{label}</span>
+                          <div style={{display:"flex", alignItems:"baseline", gap:8}}>
+                            <span style={{fontFamily:"var(--mono)", color:T.muted, fontSize:12}}>{fmtS(past)}</span>
+                            <span style={{color:T.muted, fontSize:11}}>→</span>
+                            <span style={{fontFamily:"var(--mono)", color:col, fontSize:14, fontWeight:700}}>{fmtS(now)}</span>
+                          </div>
+                        </div>
+                        <div style={{textAlign:"right", marginTop:2}}>
+                          <span style={{fontFamily:"var(--mono)", fontSize:10, fontWeight:700, color:diff>=0?T.green:T.red}}>{diff>=0?"▲ +":"▼ "}{fmtS(Math.abs(diff))}</span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div style={{padding:"22px 16px", textAlign:"center", color:T.muted, fontSize:12}}>Not enough data for YoY comparison</div>
+              )}
+            </Card>
+          </>
+        );
+      })()}
+
       {/* ── Export Buttons ── */}
       {sortedKeys.length > 0 && (
-        <div style={{display:"flex", gap:8, marginBottom:12}}>
-          {/* Google Sheets — Apps Script sync */}
-          <div onClick={()=>!exporting&&appsScriptUrl&&handleExport('sheets')}
-            style={{flex:2, display:"flex", alignItems:"center", justifyContent:"center", gap:8,
-              background: T.mode==="dark"?"linear-gradient(135deg,#0f1e0f,#0f180f)":"linear-gradient(135deg,#F0FDF4,#E8F5E9)",
-              border:`1px solid ${T.green}55`, borderRadius:16, padding:"13px 14px",
-              cursor:exporting||!appsScriptUrl?"default":"pointer", opacity:!appsScriptUrl?0.5:1,
-              boxShadow:T.cardShadow}}>
-            {exporting==='sheets'
-              ? <div style={{color:T.green, fontSize:13, fontWeight:700}}>⏳ Syncing…</div>
-              : <>
-                  <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke={T.green} strokeWidth="2" strokeLinecap="round"><path d="M12 2L12 15M12 2L8 6M12 2L16 6M3 19h18M3 15v4M21 15v4"/></svg>
-                  <div>
-                    <div style={{color:T.green, fontSize:13, fontWeight:700}}>Sync to Google Sheets</div>
-                    <div style={{color:T.muted, fontSize:10, marginTop:1}}>{appsScriptUrl?"Sends data to your sheet":"Add Apps Script URL in Settings"}</div>
-                  </div>
-                </>
-            }
+        <div style={{display:"flex", flexDirection:"column", gap:8, marginBottom:12}}>
+          {/* Row 1: Copy for Sheets + CSV */}
+          <div style={{display:"flex", gap:8}}>
+            {/* Copy to Clipboard — paste into Google Sheets */}
+            <div onClick={()=>{if(exporting) return; handleExport('clipboard').then(()=>{setCopied(true); setTimeout(()=>setCopied(false),2000);});}}
+              style={{flex:1, display:"flex", alignItems:"center", justifyContent:"center", gap:8,
+                background: T.mode==="dark"?"linear-gradient(135deg,#0f1e0f,#0f180f)":"linear-gradient(135deg,#F0FDF4,#E8F5E9)",
+                border:`1px solid ${T.green}55`, borderRadius:16, padding:"13px 14px",
+                cursor:exporting?"default":"pointer", boxShadow:T.cardShadow}}>
+              {exporting==='clipboard'
+                ? <div style={{color:T.green, fontSize:13, fontWeight:700}}>Copying…</div>
+                : copied
+                ? <div style={{color:T.green, fontSize:13, fontWeight:700}}>Copied! Paste in Google Sheets</div>
+                : <>
+                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke={T.green} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+                    <div>
+                      <div style={{color:T.green, fontSize:13, fontWeight:700}}>Copy for Sheets</div>
+                      <div style={{color:T.muted, fontSize:10, marginTop:1}}>Paste directly into Google Sheets</div>
+                    </div>
+                  </>
+              }
+            </div>
+            {/* CSV download */}
+            <div onClick={()=>!exporting&&handleExport('csv')}
+              style={{flex:1, display:"flex", alignItems:"center", justifyContent:"center", gap:7,
+                background:T.inBg, border:`1px solid ${T.border}`, borderRadius:16, padding:"13px 10px",
+                cursor:exporting?"default":"pointer", boxShadow:T.cardShadow}}>
+              {exporting==='csv'
+                ? <div style={{color:T.muted, fontSize:12, fontWeight:700}}>Building…</div>
+                : <>
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke={T.sub} strokeWidth="2" strokeLinecap="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                    <div>
+                      <div style={{color:T.sub, fontSize:12, fontWeight:600}}>.csv</div>
+                      <div style={{color:T.muted, fontSize:9, marginTop:1}}>Import into Sheets</div>
+                    </div>
+                  </>
+              }
+            </div>
           </div>
-          {/* xlsx download */}
-          <div onClick={()=>!exporting&&handleExport('download')}
-            style={{flex:1, display:"flex", alignItems:"center", justifyContent:"center", gap:7,
-              background:T.inBg, border:`1px solid ${T.border}`, borderRadius:16, padding:"13px 10px",
-              cursor:exporting?"default":"pointer", boxShadow:T.cardShadow}}>
-            {exporting==='download'
-              ? <div style={{color:T.muted, fontSize:12, fontWeight:700}}>⏳ Building…</div>
-              : <>
-                  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke={T.sub} strokeWidth="2" strokeLinecap="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                  <div style={{color:T.sub, fontSize:12, fontWeight:600}}>.xlsx</div>
-                </>
-            }
+          {/* Row 2: Apps Script sync + xlsx */}
+          <div style={{display:"flex", gap:8}}>
+            {/* Google Sheets — Apps Script sync */}
+            <div onClick={()=>!exporting&&appsScriptUrl&&handleExport('sheets')}
+              style={{flex:2, display:"flex", alignItems:"center", justifyContent:"center", gap:8,
+                background: T.mode==="dark"?"linear-gradient(135deg,#0f1e0f,#0f180f)":"linear-gradient(135deg,#F0FDF4,#E8F5E9)",
+                border:`1px solid ${T.green}55`, borderRadius:16, padding:"13px 14px",
+                cursor:exporting||!appsScriptUrl?"default":"pointer", opacity:!appsScriptUrl?0.5:1,
+                boxShadow:T.cardShadow}}>
+              {exporting==='sheets'
+                ? <div style={{color:T.green, fontSize:13, fontWeight:700}}>Syncing…</div>
+                : <>
+                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke={T.green} strokeWidth="2" strokeLinecap="round"><path d="M12 2L12 15M12 2L8 6M12 2L16 6M3 19h18M3 15v4M21 15v4"/></svg>
+                    <div>
+                      <div style={{color:T.green, fontSize:13, fontWeight:700}}>Sync to Google Sheets</div>
+                      <div style={{color:T.muted, fontSize:10, marginTop:1}}>{appsScriptUrl?"Sends data to your sheet":"Add Apps Script URL in Settings"}</div>
+                    </div>
+                  </>
+              }
+            </div>
+            {/* xlsx download */}
+            <div onClick={()=>!exporting&&handleExport('download')}
+              style={{flex:1, display:"flex", alignItems:"center", justifyContent:"center", gap:7,
+                background:T.inBg, border:`1px solid ${T.border}`, borderRadius:16, padding:"13px 10px",
+                cursor:exporting?"default":"pointer", boxShadow:T.cardShadow}}>
+              {exporting==='download'
+                ? <div style={{color:T.muted, fontSize:12, fontWeight:700}}>Building…</div>
+                : <>
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke={T.sub} strokeWidth="2" strokeLinecap="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                    <div style={{color:T.sub, fontSize:12, fontWeight:600}}>.xlsx</div>
+                  </>
+              }
+            </div>
           </div>
         </div>
       )}
@@ -1572,7 +2000,7 @@ function HomeScreen({month, goalSaved, goalTargets, goalsConfig, onNewMonth, cur
               <div style={{padding:"24px", textAlign:"center", color:T.muted, fontSize:13}}>No history yet</div>
             ) : sortedKeys.map((key,idx)=>{
               const m=months[key];
-              const inc=m.paychecks.reduce((s,p)=>s+(parseFloat(p.amount)||0),0)+(parseFloat(m.commission?.amount)||0);
+              const inc=m.paychecks.reduce((s,p)=>s+(parseFloat(p.amount)||0),0)+(parseFloat(m.commission?.amount)||0)+(parseFloat(m.startingBalance)||0)+(m.sideIncome||[]).reduce((s,t)=>s+(parseFloat(t.amount)||0),0);
               const cards=(m.amex?.paid?(parseFloat(m.amex?.statementBalance)||0):0)+(m.boa?.paid?(parseFloat(m.boa?.statementBalance)||0):0);
               const bills=m.bills.filter(b=>b.paid).reduce((s,b)=>s+b.amount,0);
               const direct=(m.directTransactions||[]).reduce((s,t)=>s+(parseFloat(t.amount)||0),0);
@@ -1617,19 +2045,51 @@ function HomeScreen({month, goalSaved, goalTargets, goalsConfig, onNewMonth, cur
 }
 
 // ── PAYCHECKS SCREEN ──────────────────────────────────────────
-function PaychecksScreen({month, setMonth}) {
+function PaychecksScreen({month, setMonth, goalsConfig=[], billTemplates=[]}) {
   const T = useT();
   const upd   = (id,f,v) => setMonth(m=>({...m, paychecks:m.paychecks.map(p=>p.id===id?{...p,[f]:v}:p)}));
   const total = month.paychecks.reduce((s,p)=>s+(parseFloat(p.amount)||0),0);
   const comm  = parseFloat(month.commission?.amount)||0;
-  const totalIn   = total+comm+(parseFloat(month.startingBalance)||0);
+  const sideIncomeTotal = (month.sideIncome||[]).reduce((s,t)=>s+(parseFloat(t.amount)||0),0);
+  const totalIn   = total+comm+(parseFloat(month.startingBalance)||0)+sideIncomeTotal;
   const amexBal   = month.amex?.paid?(parseFloat(month.amex?.statementBalance)||0):0;
   const boaBal    = month.boa?.paid?(parseFloat(month.boa?.statementBalance)||0):0;
   const fixedOut  = month.bills.filter(b=>b.paid).reduce((s,b)=>s+b.amount,0);
   const directOut = (month.directTransactions||[]).reduce((s,t)=>s+(parseFloat(t.amount)||0),0);
-  const goalOut   = Object.entries(month.goalContributions||{}).filter(([id])=>id!=="3").reduce((s,[,v])=>s+v,0);
+  const goalOut   = Object.entries(month.goalContributions||{}).filter(([id])=>!goalsConfig.find(g=>String(g.id)===id)?.preTax).reduce((s,[,v])=>s+v,0);
   const balance   = totalIn-amexBal-boaBal-fixedOut-directOut-goalOut;
   const balColor  = balance>400?T.green:balance>100?T.yellow:T.red;
+
+  // ── Dynamic commission recommendations (#11) ──
+  const pendingBillsAmt = month.bills.filter(b=>!b.paid).reduce((s,b)=>s+b.amount,0);
+  const goalTargetsSum  = goalsConfig.filter(g=>!g.preTax).reduce((s,g)=>s+(g.monthly||0),0);
+  const unpaidCards     = (!month.amex?.paid?(parseFloat(month.amex?.statementBalance)||0):0)
+                        + (!month.boa?.paid?(parseFloat(month.boa?.statementBalance)||0):0);
+  const commRecs = (() => {
+    if (comm<=0) return [];
+    let left = comm;
+    const out = [];
+    const billsTake = Math.min(left, pendingBillsAmt); left -= billsTake;
+    out.push({label:"🧾 Bills Due", amount:billsTake, color:T.red, sub:"Pay first"});
+    const goalsTake = Math.min(left, goalTargetsSum); left -= goalsTake;
+    out.push({label:"🎯 Goal Targets", amount:goalsTake, color:T.purple, sub:"Save next"});
+    const cardsTake = Math.min(left, unpaidCards); left -= cardsTake;
+    out.push({label:"💳 Cards", amount:cardsTake, color:T.teal, sub:"If balance exists"});
+    out.push({label:"🎉 Free to Spend", amount:Math.max(0,left), color:T.yellow, sub:"Whatever's left"});
+    return out;
+  })();
+
+  // ── Side income (#14) ──
+  const sideTypes = ["freelance","bonus","side-gig","other"];
+  const [newSideLabel, setNewSideLabel] = useState("");
+  const [newSideAmt,   setNewSideAmt]   = useState("");
+  const [newSideType,  setNewSideType]  = useState("freelance");
+  const addSide = () => {
+    if(!newSideLabel.trim()||!newSideAmt) return;
+    setMonth(m=>({...m, sideIncome:[...(m.sideIncome||[]),{id:Date.now(),label:newSideLabel.trim(),amount:parseFloat(newSideAmt)||0,type:newSideType}]}));
+    setNewSideLabel(""); setNewSideAmt(""); setNewSideType("freelance");
+  };
+  const removeSide = id => setMonth(m=>({...m, sideIncome:(m.sideIncome||[]).filter(t=>t.id!==id)}));
 
   return (
     <div>
@@ -1677,17 +2137,58 @@ function PaychecksScreen({month, setMonth}) {
           </div>
           {comm>0&&(
             <>
-              <div style={{color:T.muted, fontSize:10, fontWeight:700, letterSpacing:0.8, marginBottom:8}}>RECOMMENDED FROM COMMISSION</div>
+              <div style={{color:T.muted, fontSize:10, fontWeight:700, letterSpacing:0.8, marginBottom:8}}>SMART SPLIT — BASED ON WHAT YOU OWE</div>
               <div style={{display:"grid", gridTemplateColumns:"1fr 1fr", gap:8}}>
-                {[["💾 Save 20%",comm*0.2,T.green,"HYSA"],["📈 Invest 20%",comm*0.2,T.teal,"Roth IRA"],["💳 Cards 30%",comm*0.3,T.red,"Pay balances"],["🎉 Keep 30%",comm*0.3,T.yellow,"Spending"]].map(([l,v,c,s])=>(
-                  <div key={l} style={{background:T.inBg, borderRadius:12, padding:"10px 12px"}}>
-                    <div style={{color:T.muted, fontSize:10, fontWeight:600}}>{l}</div>
-                    <div style={{color:c, fontSize:15, fontWeight:800}}>{fmt(v)}</div>
-                    <div style={{color:T.muted, fontSize:10}}>{s}</div>
+                {commRecs.map(({label,amount,color,sub})=>(
+                  <div key={label} style={{background:T.inBg, borderRadius:12, padding:"10px 12px"}}>
+                    <div style={{color:T.muted, fontSize:10, fontWeight:600}}>{label}</div>
+                    <div style={{color, fontSize:15, fontWeight:800}}>{fmt(amount)}</div>
+                    <div style={{color:T.muted, fontSize:10}}>{sub}</div>
                   </div>
                 ))}
               </div>
             </>
+          )}
+        </div>
+      </Card>
+
+      <SLabel>💵 Side Income</SLabel>
+      <Card style={{border:`1px solid ${T.green}22`}}>
+        <div style={{padding:"14px 16px"}}>
+          <div style={{color:T.muted, fontSize:11, marginBottom:12, lineHeight:1.5}}>Freelance, bonuses, side gigs & other extra income</div>
+          <div style={{display:"flex", gap:8, marginBottom:10, alignItems:"center"}}>
+            <input type="text" placeholder="Source" value={newSideLabel} onChange={e=>setNewSideLabel(e.target.value)}
+              style={{flex:1, background:T.inBg, border:`1.5px solid ${T.inBorder}`, borderRadius:11, color:T.text, fontSize:16, padding:"8px 12px", outline:"none", fontFamily:"inherit", minWidth:0}}/>
+            <MInput value={newSideAmt} onChange={setNewSideAmt} placeholder="0.00" hi={!!newSideAmt} sm/>
+          </div>
+          <div style={{display:"flex", gap:8, marginBottom:12, alignItems:"center"}}>
+            <select value={newSideType} onChange={e=>setNewSideType(e.target.value)}
+              style={{flex:1, background:T.inBg, border:`1.5px solid ${T.inBorder}`, borderRadius:11, color:T.text, fontSize:14, padding:"8px 10px", outline:"none", cursor:"pointer", textTransform:"capitalize"}}>
+              {sideTypes.map(t=><option key={t} value={t}>{t}</option>)}
+            </select>
+            <div onClick={addSide} style={{background:T.green, borderRadius:11, padding:"8px 14px", cursor:"pointer", color:"#fff", fontSize:14, fontWeight:700, flexShrink:0}}>+ Add</div>
+          </div>
+          {(month.sideIncome||[]).length===0 ? (
+            <div style={{color:T.muted, fontSize:12, textAlign:"center", padding:"8px 0"}}>No side income logged yet</div>
+          ) : (
+            <div>
+              {(month.sideIncome||[]).map((tx,i,arr)=>(
+                <div key={tx.id} style={{display:"flex", alignItems:"center", justifyContent:"space-between", paddingBottom:i<arr.length-1?10:0, marginBottom:i<arr.length-1?10:0, borderBottom:i<arr.length-1?`1px solid ${T.div}`:"none"}}>
+                  <div>
+                    <span style={{color:T.sub, fontSize:13}}>{tx.label}</span>
+                    <span style={{color:T.muted, fontSize:10, marginLeft:7, textTransform:"capitalize"}}>{tx.type}</span>
+                  </div>
+                  <div style={{display:"flex", alignItems:"center", gap:10}}>
+                    <span style={{color:T.green, fontSize:14, fontWeight:700}}>{fmt(tx.amount)}</span>
+                    <div onClick={()=>removeSide(tx.id)} style={{color:T.muted, fontSize:16, cursor:"pointer", padding:"0 4px"}}>✕</div>
+                  </div>
+                </div>
+              ))}
+              <div style={{display:"flex", justifyContent:"space-between", marginTop:12, paddingTop:10, borderTop:`1px solid ${T.div}`}}>
+                <span style={{color:T.sub, fontSize:13, fontWeight:600}}>Total Side Income</span>
+                <span style={{color:T.green, fontSize:15, fontWeight:800}}>{fmt(sideIncomeTotal)}</span>
+              </div>
+            </div>
           )}
         </div>
       </Card>
@@ -1722,9 +2223,10 @@ function PaychecksScreen({month, setMonth}) {
 }
 
 // ── CARD ENTRY ────────────────────────────────────────────────
-function CardEntry({ck, emoji, name, color, subs, month, togglePaid, updBal}) {
+function CardEntry({ck, emoji, name, color, subs, month, togglePaid, updBal, limit}) {
   const T = useT();
-  const LIMIT=1000, ALERT=750;
+  const LIMIT = limit || 1000;
+  const ALERT = LIMIT * 0.75;
   const card=month[ck]||{};
   const bal=parseFloat(card.statementBalance)||0;
   const st=subs.reduce((s,x)=>s+x.amount,0);
@@ -1792,7 +2294,7 @@ function CardEntry({ck, emoji, name, color, subs, month, togglePaid, updBal}) {
 }
 
 // ── CARDS SCREEN ──────────────────────────────────────────────
-function CardsScreen({month, setMonth, amexSubs, boaSubs}) {
+function CardsScreen({month, setMonth, amexSubs, boaSubs, cardLimits={amex:1000,boa:1000}}) {
   const T = useT();
   const togglePaid = k => setMonth(m=>({...m,[k]:{...m[k],paid:!m[k].paid}}));
   const updBal     = (k,v) => setMonth(m=>({...m,[k]:{...m[k],statementBalance:v}}));
@@ -1814,8 +2316,8 @@ function CardsScreen({month, setMonth, amexSubs, boaSubs}) {
 
   return (
     <div>
-      <CardEntry ck="amex" emoji="💳" name="American Express" color="#5B8FFF" subs={amexSubs} month={month} togglePaid={togglePaid} updBal={updBal}/>
-      <CardEntry ck="boa"  emoji="🏦" name="Bank of America"  color="#F59E0B" subs={boaSubs}  month={month} togglePaid={togglePaid} updBal={updBal}/>
+      <CardEntry ck="amex" emoji="💳" name="American Express" color="#5B8FFF" subs={amexSubs} month={month} togglePaid={togglePaid} updBal={updBal} limit={cardLimits.amex}/>
+      <CardEntry ck="boa"  emoji="🏦" name="Bank of America"  color="#F59E0B" subs={boaSubs}  month={month} togglePaid={togglePaid} updBal={updBal} limit={cardLimits.boa}/>
 
       <SLabel>Fixed Bills</SLabel>
       <Card>
@@ -1904,8 +2406,8 @@ function GCard({g, goalSaved, setGoalSaved, goalTargets, setGoalTargets, onContr
   const mos     = g.monthly>0?Math.ceil(rem/g.monthly):"—";
   const done    = pct>=1;
   const contrib = currentMonth.goalContributions?.[g.id]||0;
-  const isCamaro = g.id===5;
-  const is401k   = g.id===3;
+  const isCamaro = g.label?.toLowerCase().includes('camaro');
+  const is401k   = !!g.preTax;
   const close = () => {setMode("idle"); setVal("");};
 
   const handleAdd = () => {
@@ -2025,7 +2527,8 @@ function GoalsScreen({goalSaved, setGoalSaved, goalTargets, setGoalTargets, onCo
                       + (month.boa?.paid?(parseFloat(month.boa?.statementBalance)||0):0)
                       + month.bills.filter(b=>b.paid).reduce((s,b)=>s+b.amount,0)
                       + (month.directTransactions||[]).reduce((s,t)=>s+(parseFloat(t.amount)||0),0);
-  const camaroSaved = goalSaved[5]||0;
+  const camaroG     = goalsConfig.find(g=>g.label?.toLowerCase().includes('camaro'));
+  const camaroSaved = camaroG ? (goalSaved[camaroG.id]||0) : 0;
   const leftover    = Math.max(0,(appPaycheck*2+appCommission)-appExpenses);
   const recSave     = leftover*(camaroMode==="aggressive"?0.3:0.1);
   const otherSave   = leftover*(camaroMode==="aggressive"?0.1:0.3);
@@ -2036,7 +2539,7 @@ function GoalsScreen({goalSaved, setGoalSaved, goalTargets, setGoalTargets, onCo
 
   const handleCamaroSave = () => {
     const a=parseFloat(saveAmt)||Math.round(recSave/2);
-    if(a>0){onContribute(5,a);setSavedFlash(true);setSaveAmt("");setTimeout(()=>setSavedFlash(false),2500);}
+    if(a>0&&camaroG){onContribute(camaroG.id,a);setSavedFlash(true);setSaveAmt("");setTimeout(()=>setSavedFlash(false),2500);}
   };
 
   const camaroTracker = (
@@ -2127,7 +2630,7 @@ function GoalsScreen({goalSaved, setGoalSaved, goalTargets, setGoalTargets, onCo
           goalTargets={goalTargets} setGoalTargets={setGoalTargets}
           onContribute={onContribute} currentMonth={currentMonth} setMonth={setMonth}
           camaroOpen={camaroOpen} setCamaroOpen={setCamaroOpen}
-          camaroProps={g.id===5?camaroTracker:null}/>
+          camaroProps={g.label?.toLowerCase().includes('camaro')?camaroTracker:null}/>
       ))}
     </div>
   );
@@ -2225,17 +2728,20 @@ function EditPayScreen({onBack, paycheckLabels, setPaycheckLabels}) {
 }
 
 // ── EDIT CARDS SCREEN ─────────────────────────────────────────
-function EditCardsScreen({onBack, amexSubs, setAmexSubs, boaSubs, setBoaSubs, billTemplates, setBillTemplates}) {
+function EditCardsScreen({onBack, amexSubs, setAmexSubs, boaSubs, setBoaSubs, billTemplates, setBillTemplates, cardLimits={amex:1000,boa:1000}, setCardLimits}) {
   const T = useT();
   const [aList, setAList] = useState(amexSubs.map(s=>({...s})));
   const [bList, setBList] = useState(boaSubs.map(s=>({...s})));
   const [bills, setBills] = useState(billTemplates.map(b=>({...b})));
+  const [limits, setLimits] = useState({amex:cardLimits.amex||1000, boa:cardLimits.boa||1000});
   const [newA, setNewA]   = useState({label:"",amount:""});
   const [newB, setNewB]   = useState({label:"",amount:""});
   const [newBill, setNewBill] = useState({label:"",due:"Monthly",amount:"",icon:"🏠"});
 
   const save = () => {
-    setAmexSubs(aList); setBoaSubs(bList); setBillTemplates(bills); onBack();
+    setAmexSubs(aList); setBoaSubs(bList); setBillTemplates(bills);
+    if(setCardLimits) setCardLimits({amex:parseFloat(limits.amex)||1000, boa:parseFloat(limits.boa)||1000});
+    onBack();
   };
 
   const SubRow = ({item, onUpdate, onRemove, color}) => (
@@ -2265,6 +2771,27 @@ function EditCardsScreen({onBack, amexSubs, setAmexSubs, boaSubs, setBoaSubs, bi
   return (
     <div>
       <BackBtn onBack={onBack} label="Back to Settings"/>
+
+      <SLabel>Credit Limits</SLabel>
+      <Card>
+        <div style={{display:"flex", alignItems:"center", gap:8, padding:"11px 16px"}}>
+          <span style={{flex:1, color:T.text, fontSize:14, fontWeight:500}}>💳 American Express</span>
+          <div style={{position:"relative", display:"inline-flex", alignItems:"center", flexShrink:0}}>
+            <span style={{position:"absolute", left:7, color:"#5B8FFF", fontSize:12, fontWeight:700, pointerEvents:"none"}}>$</span>
+            <input type="number" value={limits.amex} onChange={e=>setLimits(s=>({...s,amex:e.target.value}))} placeholder="1000"
+              style={{background:T.inBg, border:`1.5px solid ${T.inBorder}`, borderRadius:9, color:T.text, fontSize:16, fontWeight:700, padding:"7px 8px 7px 18px", width:90, textAlign:"right", outline:"none", fontFamily:"var(--mono)"}}/>
+          </div>
+        </div>
+        <Div/>
+        <div style={{display:"flex", alignItems:"center", gap:8, padding:"11px 16px"}}>
+          <span style={{flex:1, color:T.text, fontSize:14, fontWeight:500}}>🏦 Bank of America</span>
+          <div style={{position:"relative", display:"inline-flex", alignItems:"center", flexShrink:0}}>
+            <span style={{position:"absolute", left:7, color:"#F59E0B", fontSize:12, fontWeight:700, pointerEvents:"none"}}>$</span>
+            <input type="number" value={limits.boa} onChange={e=>setLimits(s=>({...s,boa:e.target.value}))} placeholder="1000"
+              style={{background:T.inBg, border:`1.5px solid ${T.inBorder}`, borderRadius:9, color:T.text, fontSize:16, fontWeight:700, padding:"7px 8px 7px 18px", width:90, textAlign:"right", outline:"none", fontFamily:"var(--mono)"}}/>
+          </div>
+        </div>
+      </Card>
 
       <SLabel>💳 Amex Subscriptions</SLabel>
       <Card>
@@ -2355,11 +2882,26 @@ function EditGoalsScreen({onBack, goalsConfig, setGoalsConfig, goalSaved, setGoa
   const [newG, setNewG]     = useState({label:"",target:"",monthly:"",type:"foundation",color:GOAL_COLORS[0],icon:GOAL_ICONS[0]});
 
   const upd = (id,field,val) => setList(l=>l.map(g=>g.id===id?{...g,[field]:val}:g));
+  const moveUp = (i) => { if(i<=0) return; setList(l=>{const n=[...l];[n[i-1],n[i]]=[n[i],n[i-1]];return n;}); };
+  const moveDown = (i) => { if(i>=list.length-1) return; setList(l=>{const n=[...l];[n[i],n[i+1]]=[n[i+1],n[i]];return n;}); };
 
   const save = () => {
     const newIds = list.map(g=>g.id);
     const addedGoals = list.filter(g=>!goalsConfig.find(og=>og.id===g.id));
+    const removedIds = goalsConfig.filter(g => !list.find(lg => lg.id === g.id)).map(g => g.id);
     setGoalsConfig(list);
+    if (removedIds.length > 0) {
+      setGoalSaved(prev => {
+        const next = {...prev};
+        removedIds.forEach(id => delete next[id]);
+        return next;
+      });
+      setGoalTargets(prev => {
+        const next = {...prev};
+        removedIds.forEach(id => delete next[id]);
+        return next;
+      });
+    }
     if(addedGoals.length>0){
       setGoalSaved(prev=>({...prev,...Object.fromEntries(addedGoals.map(g=>[g.id,prev[g.id]??0]))}));
       setGoalTargets(prev=>({...prev,...Object.fromEntries(addedGoals.map(g=>[g.id,g.target]))}));
@@ -2396,6 +2938,10 @@ function EditGoalsScreen({onBack, goalsConfig, setGoalsConfig, goalSaved, setGoa
             <div style={{display:"flex", alignItems:"center", gap:8, marginBottom:10}}>
               <div style={{width:10, height:10, borderRadius:5, background:g.color, flexShrink:0}}/>
               <TxtInput value={g.label} onChange={v=>upd(g.id,"label",v)} placeholder="Goal name"/>
+              <div style={{display:"flex", flexDirection:"column", gap:1, flexShrink:0}}>
+                <div onClick={()=>moveUp(i)} style={{color:i<=0?T.muted:T.accent, fontSize:11, cursor:i<=0?"default":"pointer", lineHeight:1, padding:"1px 4px", opacity:i<=0?0.35:1}}>▲</div>
+                <div onClick={()=>moveDown(i)} style={{color:i>=arr.length-1?T.muted:T.accent, fontSize:11, cursor:i>=arr.length-1?"default":"pointer", lineHeight:1, padding:"1px 4px", opacity:i>=arr.length-1?0.35:1}}>▼</div>
+              </div>
               <div onClick={()=>setList(l=>l.filter(x=>x.id!==g.id))} style={{color:T.red, fontSize:18, cursor:"pointer", flexShrink:0}}>✕</div>
             </div>
             <div style={{display:"flex", gap:8}}>
@@ -2525,13 +3071,52 @@ function EditGoalsScreen({onBack, goalsConfig, setGoalsConfig, goalSaved, setGoa
 }
 
 // ── SETTINGS SCREEN ───────────────────────────────────────────
-function SettingsScreen({themeMode, setThemeMode, amexSubs, setAmexSubs, boaSubs, setBoaSubs, goalsConfig, setGoalsConfig, goalSaved, setGoalSaved, goalTargets, setGoalTargets, billTemplates, setBillTemplates, paycheckLabels, setPaycheckLabels, setMonths, appsScriptUrl, setAppsScriptUrl, appsScriptSecret, setAppsScriptSecret, onDisconnect, syncStatus, lastSync, syncError}) {
+function SettingsScreen({themeMode, setThemeMode, amexSubs, setAmexSubs, boaSubs, setBoaSubs, goalsConfig, setGoalsConfig, goalSaved, setGoalSaved, goalTargets, setGoalTargets, billTemplates, setBillTemplates, setBillTemplatesRaw, paycheckLabels, setPaycheckLabels, cardLimits, setCardLimits, months, setMonths, appsScriptUrl, setAppsScriptUrl, appsScriptSecret, setAppsScriptSecret, onDisconnect, syncStatus, lastSync, syncError}) {
   const T = useT();
   const [view, setView] = useState("main");
+  const [importMsg, setImportMsg] = useState("");
   const isDark = themeMode==="dark";
 
+  const exportBackup = () => {
+    const backup = {months, goalSaved, goalTargets, goalsConfig, amexSubs, boaSubs, billTemplates, paycheckLabels, cardLimits, _exported:new Date().toISOString()};
+    const blob = new Blob([JSON.stringify(backup,null,2)], {type:"application/json"});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `MyBudget_Backup_${new Date().toISOString().slice(0,10)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const importBackup = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      try {
+        const d = JSON.parse(ev.target.result);
+        if (d.months) setMonths(d.months);
+        if (d.goalSaved) setGoalSaved(d.goalSaved);
+        if (d.goalTargets) setGoalTargets(d.goalTargets);
+        if (d.goalsConfig) setGoalsConfig(d.goalsConfig);
+        if (d.amexSubs) setAmexSubs(d.amexSubs);
+        if (d.boaSubs) setBoaSubs(d.boaSubs);
+        if (d.billTemplates) (setBillTemplatesRaw||setBillTemplates)(d.billTemplates);
+        if (d.paycheckLabels) setPaycheckLabels(d.paycheckLabels);
+        if (d.cardLimits && setCardLimits) setCardLimits(d.cardLimits);
+        setImportMsg("✅ Backup restored successfully");
+        setTimeout(()=>setImportMsg(""), 3000);
+      } catch(err) {
+        setImportMsg("❌ Invalid backup file");
+        setTimeout(()=>setImportMsg(""), 3000);
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = "";
+  };
+
   if (view==="pay")   return <EditPayScreen   onBack={()=>setView("main")} paycheckLabels={paycheckLabels} setPaycheckLabels={setPaycheckLabels}/>;
-  if (view==="cards") return <EditCardsScreen onBack={()=>setView("main")} amexSubs={amexSubs} setAmexSubs={setAmexSubs} boaSubs={boaSubs} setBoaSubs={setBoaSubs} billTemplates={billTemplates} setBillTemplates={setBillTemplates}/>;
+  if (view==="cards") return <EditCardsScreen onBack={()=>setView("main")} amexSubs={amexSubs} setAmexSubs={setAmexSubs} boaSubs={boaSubs} setBoaSubs={setBoaSubs} billTemplates={billTemplates} setBillTemplates={setBillTemplates} cardLimits={cardLimits} setCardLimits={setCardLimits}/>;
   if (view==="goals") return <EditGoalsScreen onBack={()=>setView("main")} goalsConfig={goalsConfig} setGoalsConfig={setGoalsConfig} goalSaved={goalSaved} setGoalSaved={setGoalSaved} goalTargets={goalTargets} setGoalTargets={setGoalTargets} setMonths={setMonths}/>;
 
   return (
@@ -2602,6 +3187,23 @@ function SettingsScreen({themeMode, setThemeMode, amexSubs, setAmexSubs, boaSubs
           </div>
         </Card>
       )}
+
+      <SLabel>Data</SLabel>
+      <Card>
+        <div style={{padding:"14px 16px"}}>
+          <div style={{color:T.muted, fontSize:11, marginBottom:12, lineHeight:1.5}}>Save a full backup of your data, or restore from a previous backup file.</div>
+          <div style={{display:"flex", gap:8}}>
+            <div onClick={exportBackup} style={{flex:1, display:"flex", alignItems:"center", justifyContent:"center", gap:7, background:`${T.green}14`, border:`1px solid ${T.green}44`, borderRadius:12, padding:"11px", cursor:"pointer"}}>
+              <span style={{color:T.green, fontSize:13, fontWeight:700}}>⬇ Export Backup</span>
+            </div>
+            <label style={{flex:1, display:"flex", alignItems:"center", justifyContent:"center", gap:7, background:`${T.accent}14`, border:`1px solid ${T.accent}44`, borderRadius:12, padding:"11px", cursor:"pointer"}}>
+              <span style={{color:T.accent, fontSize:13, fontWeight:700}}>⬆ Import Backup</span>
+              <input type="file" accept=".json,application/json" onChange={importBackup} style={{display:"none"}}/>
+            </label>
+          </div>
+          {importMsg && <div style={{marginTop:10, textAlign:"center", fontSize:12, fontWeight:600, color:importMsg.startsWith("✅")?T.green:T.red}}>{importMsg}</div>}
+        </div>
+      </Card>
 
       <SLabel>Appearance</SLabel>
       <Card>
